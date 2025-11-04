@@ -1,0 +1,9 @@
+Dockerfile
+swanlog/
+__pycache__/
+.DS_Store
+wandb/
+**/.ipynb_checkpoints/
+pretraining_data_cache/
+logs/
+checkpoints/
