@@ -203,16 +203,14 @@ def log_training_step(step, loss, total_norm, clipped_norm, scheduler, dataloade
             "loss": loss.item(),
             "current_epoch": current_epoch,
             "learning_rate": scheduler.get_last_lr()[0],
-            "grad_norm_before_clip": total_norm.item(),
-            "grad_norm_after_clip": clipped_norm.item(),
+            
         })
         swanlab.log({
             "step": step,
             "loss": loss.item(),
             "current_epoch": current_epoch,
             "learning_rate": scheduler.get_last_lr()[0],
-            "grad_norm_before_clip": total_norm.item(),
-            "grad_norm_after_clip": clipped_norm.item(),
+    
         })
 
 def save_checkpoint(save_dir, step, model_engine, loss, accelerator, config=None, norm_stats=None):
