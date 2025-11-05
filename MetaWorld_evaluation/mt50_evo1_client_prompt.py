@@ -28,38 +28,38 @@ SHOW_WINDOW = True
 SAVE_IMAGE = False
 
 # ===================== Debug image saving =====================
-INSPECT_SAMPLE_PER_EPISODE = True        # 每个 episode 随机保存 1 张“发送帧”
-INSPECT_DIR = "inspect_frames"           # 输出目录
-APPLY_ROT_180 = True                     # 是否对图像旋转 180°（发送与保存都一致）
-APPLY_CENTER_CROP = True                 # 旋转后进行中心裁剪
-CROP_KEEP_RATIO = 2/3                    # 保留中心 多少（宽和高各按此比例）
-INSPECT_SAVE_STEP_TAG = True             # 文件名里是否带上 step 号
+INSPECT_SAMPLE_PER_EPISODE = True        
+INSPECT_DIR = "inspect_frames"           
+APPLY_ROT_180 = True                     
+APPLY_CENTER_CROP = True                 
+CROP_KEEP_RATIO = 2/3                    
+INSPECT_SAVE_STEP_TAG = True             
 # =============================================================
 
 # ===================== User Config (edit here) =====================
 SERVER_URL = "ws://127.0.0.1:9000"
 
 # Camera & image settings
-CAMERA_NAME = "corner2"        # fixed single view
-IMG_SIZE = (448, 448)          # set to None to use raw render size
+CAMERA_NAME = "corner2"        
+IMG_SIZE = (448, 448)          
 
 # Evo1 & rollout settings
-STATE_TAKE = 8                 # first N dims from low-dim obs (server pads to 24)
-HORIZON = 15                   # actions returned per inference call
-EPISODES = 10                  # number of evaluation episodes
-EPISODE_HORIZON = 400          # max env.step() per (episode, task)
+STATE_TAKE = 8                
+HORIZON = 15                  
+EPISODES = 10                  
+EPISODE_HORIZON = 400          
 SEED = 4042
 
 TARGET_LEVEL = "all"   # one of "all", "easy", "medium", "hard", "very_hard"
 
 # Order source
-ORDER_JSON_PATH = "mt50_order.json"      # 由 list_mt50_tasks.py 生成
-# 如果缺失则退化（仅作为兜底；建议总是提供 mt50_order.json）
+ORDER_JSON_PATH = "mt50_order.json"      
+
 FALLBACK_USE_FIRST_N: Optional[int] = 5
 FALLBACK_IDX_LIST: Optional[List[int]] = None
 
 # Prompt source
-TASKS_JSONL_PATH = "tasks.jsonl"         # 每行一个 JSON，含字段 "task"（可选含 "idx" 或 "slug"）
+TASKS_JSONL_PATH = "tasks.jsonl"         
 # ==================================================================
 
 # Headless GL by default; switch to 'glfw' on a desktop if you want
@@ -83,17 +83,14 @@ def obs_to_state(obs, take: int = STATE_TAKE) -> List[float]:
     return arr[:min(take, arr.shape[0])].tolist()
 
 def fix_camera_angle(rgb: np.ndarray) -> np.ndarray:
-    # 旋转 180°（上下+左右翻转）
+    
     return cv2.rotate(rgb, cv2.ROTATE_180)
 
 def center_crop_keep_ratio(rgb: np.ndarray, keep_ratio: float) -> np.ndarray:
-    """
-    中心裁剪，保留宽高各 keep_ratio 的区域。
-    例如 keep_ratio=1/3，则输出尺寸约为 (H/3, W/3)。
-    """
+    
     h, w = rgb.shape[:2]
     keep_ratio = float(keep_ratio)
-    keep_ratio = max(1e-6, min(1.0, keep_ratio))  # clamp to (0,1]
+    keep_ratio = max(1e-6, min(1.0, keep_ratio))  
     new_h = max(1, int(round(h * keep_ratio)))
     new_w = max(1, int(round(w * keep_ratio)))
     y0 = (h - new_h) // 2
@@ -101,21 +98,16 @@ def center_crop_keep_ratio(rgb: np.ndarray, keep_ratio: float) -> np.ndarray:
     return rgb[y0:y0 + new_h, x0:x0 + new_w, :]
 
 def render_single_bgr(env) -> np.ndarray:
-    """
-    渲染一帧 RGB，按需旋转 + 中心裁剪 + resize，转换为 BGR uint8 —— 这帧会被发送给 VLA。
-    处理顺序：render -> rotate(可选) -> center_crop(可选) -> resize(可选) -> RGB2BGR
-    关键点：每次可能产生视图(slice)的操作后都做 copy/contiguous，避免花屏。
-    """
-    # 1) 渲染并立刻“脱钩”底层缓冲（避免后续 MuJoCo 刷新导致花屏）
-    rgb = env.render()                                # HxWx3, RGB
-    rgb = np.ascontiguousarray(rgb, dtype=np.uint8)   # detach + contiguous uint8
+  
+    rgb = env.render()                               
+    rgb = np.ascontiguousarray(rgb, dtype=np.uint8)   
 
-    # 2) 旋转（如启用）
+   
     if APPLY_ROT_180:
         rgb = cv2.rotate(rgb, cv2.ROTATE_180)
         rgb = np.ascontiguousarray(rgb)
 
-    # 3) 中心裁剪（如启用）—— 裁剪会产生视图，立刻 copy
+    
     if APPLY_CENTER_CROP and (0.0 < CROP_KEEP_RATIO < 1.0):
         h, w = rgb.shape[:2]
         keep = float(CROP_KEEP_RATIO)
@@ -126,22 +118,22 @@ def render_single_bgr(env) -> np.ndarray:
         rgb = rgb[y0:y0 + new_h, x0:x0 + new_w, :].copy()
         rgb = np.ascontiguousarray(rgb)
 
-    # 4) resize（如启用）
+   
     if IMG_SIZE is not None:
         rgb = cv2.resize(rgb, IMG_SIZE, interpolation=cv2.INTER_LINEAR)
         rgb = np.ascontiguousarray(rgb)
 
-    # 5) 转 BGR/uint8
+    
     bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
     bgr = np.ascontiguousarray(bgr, dtype=np.uint8)
 
-    # 6) 可选：实时显示（不影响发送给 VLA）
+    
     if 'SHOW_WINDOW' in globals() and SHOW_WINDOW:
         try:
             cv2.imshow("MetaWorld", bgr)
-            cv2.waitKey(1)   # 必须有，不然窗口不刷新
+            cv2.waitKey(1)   
         except Exception:
-            # 无显示环境（如服务器）时忽略
+           
             pass
 
     return bgr
@@ -155,7 +147,7 @@ async def evo1_infer(ws, img_bgr: np.ndarray, state_vec: List[float], prompt: Op
                   encode_image_uint8_list(dummy_img),
                   encode_image_uint8_list(dummy_img)],
         "state": state_vec,
-        "prompt": prompt,               # 这里一定是非空
+        "prompt": prompt,              
         "image_mask": [1, 0, 0],
         "action_mask": [1, 1, 1, 1] + [0]*20,
     }
@@ -165,31 +157,24 @@ async def evo1_infer(ws, img_bgr: np.ndarray, state_vec: List[float], prompt: Op
 
 
 def save_sent_bgr_frame(img_bgr: np.ndarray, ep_num: int, idx: int, slug: str, step: Optional[int] = None):
-    """
-    保存“实际将要发送给 VLA 的那一帧”（BGR/uint8，已旋转、裁剪与缩放），与模型输入完全一致。
-    """
+
     os.makedirs(INSPECT_DIR, exist_ok=True)
     tag = f"step{step:04d}" if (INSPECT_SAVE_STEP_TAG and step is not None) else "stepNA"
     out = os.path.join(INSPECT_DIR, f"ep{ep_num:03d}_idx{idx}_{slug}_{tag}.png")
-    img_bgr_safe = np.ascontiguousarray(img_bgr)  # 防止潜在的非连续内存
+    img_bgr_safe = np.ascontiguousarray(img_bgr)  
     cv2.imwrite(out, img_bgr_safe)
     h, w = img_bgr_safe.shape[:2]
     print(f"[inspect] saved {out}  size={w}x{h}  (identical to VLA input)")
 
 def log_write(text: str):
-    """追加写入到日志文件并同步打印"""
+    
     print(text)
     with open(LOG_PATH, "a", encoding="utf-8") as f:
         f.write(text + "\n")
 
 # ---------------- Prompt loader ----------------
 class PromptBook:
-    """
-    将 tasks.jsonl 中的 'task' 文本做成索引：
-      1) 若行含 'idx'，优先使用 idx -> task
-      2) 若行含 'slug'，建立 slug -> task
-      3) 否则按行序 enumerate，行号视为 idx
-    """
+
     def __init__(self, jsonl_path: str):
         self.by_idx: Dict[int, str] = {}
         self.by_slug: Dict[str, str] = {}
@@ -231,25 +216,18 @@ PROMPTS = PromptBook(TASKS_JSONL_PATH)
 
 # ---------------- Order & groups loader ----------------
 def load_order_and_groups(total_envs: int):
-    """
-    Load ordered idx list and difficulty groups from mt50_order.json.
-    If missing/unreadable, build a simple fallback idx list.
-    Returns:
-       ordered_indices: List[int]
-       groups: Dict[str, Set[str]]  # slug sets for fast lookup
-       idx_to_slug: Dict[int, str]
-    """
+   
     if os.path.exists(ORDER_JSON_PATH):
         with open(ORDER_JSON_PATH, "r") as f:
             data = json.load(f)
         ordered_indices = list(map(int, data["ordered_indices"]))
-        # JSON contains lists; convert to sets for fast membership
+     
         groups = {k: set(v) for k, v in data["groups"].items()}
         idx_to_slug = {int(k): v for k, v in data["idx_to_slug"].items()}
         print(f"[INFO] Loaded order from {ORDER_JSON_PATH} (len={len(ordered_indices)})")
         return ordered_indices, groups, idx_to_slug
 
-    # Fallback: simple contiguous or custom list
+  
     if FALLBACK_IDX_LIST:
         idx_list = [i for i in FALLBACK_IDX_LIST if 0 <= i < total_envs]
     elif FALLBACK_USE_FIRST_N:
@@ -257,7 +235,7 @@ def load_order_and_groups(total_envs: int):
     else:
         idx_list = list(range(total_envs))
     print("[WARN] mt50_order.json not found; falling back to:", idx_list)
-    # Build dummy idx_to_slug (仅兜底，不建议依赖)
+    
     idx_to_slug = {i: f"task-{i}" for i in idx_list}
     groups = {"easy": set(), "medium": set(), "hard": set(), "very_hard": set()}
     return idx_list, groups, idx_to_slug
@@ -268,10 +246,7 @@ async def eval_mt50_with_groups(server_url: str,
                                 num_eval_episodes: int = EPISODES,
                                 episode_horizon: int = EPISODE_HORIZON,
                                 seed: int = SEED):
-    """
-    Run MT50 strictly inside MT50 env, ordered by indices from mt50_order.json.
-    Track per-task success and per-difficulty success, plus overall.
-    """
+  
     # 1) Build MT50 with fixed camera
     envs = gym.make_vec(
         "Meta-World/MT50",
@@ -286,7 +261,7 @@ async def eval_mt50_with_groups(server_url: str,
     ordered_indices, groups, idx_to_slug = load_order_and_groups(total_envs)
     ordered_indices = [i for i in ordered_indices if 0 <= i < total_envs]
 
-    # 2.5) 按需筛选难度
+    
     if TARGET_LEVEL.lower() != "all":
         allowed_slugs = groups.get(TARGET_LEVEL.lower(), set())
         before = len(ordered_indices)
@@ -306,10 +281,9 @@ async def eval_mt50_with_groups(server_url: str,
             sub = envs.envs[idx]
             slug = idx_to_slug.get(idx, f"task-{idx}")
 
-            # —— 这里根据 idx/slug 取 prompt —— #
+            
             task_prompt = PROMPTS.get(idx, slug=slug)
-            # 仅调试时启用
-            # print(f"[debug]{task_prompt}")
+            
 
             gname_for_task = None
             for gname in group_trials.keys():
@@ -328,8 +302,8 @@ async def eval_mt50_with_groups(server_url: str,
                 inspect_choice = INSPECT_SAMPLE_PER_EPISODE
                 saved_this_episode = False
 
-                # 可选：让不同任务种子错开
-                obs, _ = sub.reset(seed=seed + ep)  # 或 seed + idx * 10000 + ep
+               
+                obs, _ = sub.reset(seed=seed + ep)  
                 trials_counts[idx] += 1
                 if gname_for_task is not None:
                     group_trials[gname_for_task] += 1
@@ -356,10 +330,7 @@ async def eval_mt50_with_groups(server_url: str,
 
                     state_vec = obs_to_state(obs)
 
-                    # # 仅调试时启用
-                    # print(f"[debug]{task_prompt}")
-
-                    # —— 将 prompt 传给服务端 —— #
+                 
                     actions = await evo1_infer(ws, img_bgr, state_vec, prompt=task_prompt)
 
                     for i in range(HORIZON):
@@ -379,7 +350,7 @@ async def eval_mt50_with_groups(server_url: str,
                             done = True
                             break
 
-            # 一个任务所有 episodes 跑完后，计算一次该任务准确率
+          
             s = success_counts[idx]
             t = trials_counts[idx]
             task_rate = s / max(1, t)
@@ -457,79 +428,11 @@ async def _amain():
 if __name__ == "__main__":
     asyncio.run(_amain())
 
-# # ---------------- Entrypoint ----------------
-# async def _amain():
-#     horizons = [7, 10, 13, 15, 17, 20, 22, 25]
 
-#     for hz in horizons:
-#         global HORIZON, LOG_PATH
-#         HORIZON = hz
-#         LOG_PATH = make_log_path(f"mt50_H{hz}")
-
-#         log_write(f"\n==============================")
-#         log_write(f"Start evaluation: HORIZON={hz}")
-#         log_write(f"==============================")
-
-#         per_task, per_group, overall = await eval_mt50_with_groups(
-#             server_url=SERVER_URL,
-#             num_eval_episodes=EPISODES,
-#             episode_horizon=EPISODE_HORIZON,
-#             seed=SEED,
-#         )
-
-#         # 写入日志
-#         log_write(f"\n==== Evaluation Log (HORIZON={hz}) ====")
-#         log_write(f"Target difficulty: {TARGET_LEVEL}")
-#         log_write(f"Server URL: {SERVER_URL}")
-#         log_write(f"Episodes per task: {EPISODES}")
-#         log_write(f"Episode horizon: {EPISODE_HORIZON}")
-#         log_write(f"Seed: {SEED}\n")
-
-#         log_write("==== Per-task success rate ====")
-#         for slug, rate in per_task.items():
-#             log_write(f"{slug:24s}  {rate:.3f}")
-
-#         log_write("\n==== Difficulty buckets ====")
-#         log_write(f"easy      : {per_group.get('easy', 0.0):.3f}")
-#         log_write(f"medium    : {per_group.get('medium', 0.0):.3f}")
-#         log_write(f"hard      : {per_group.get('hard', 0.0):.3f}")
-#         log_write(f"very_hard : {per_group.get('very_hard', 0.0):.3f}")
-
-#         log_write(f"\n==== Overall (average over selected tasks) ====\n{overall:.3f}")
-#         log_write(f"Finished HORIZON={hz}\n")
-
-#     log_write("\nAll evaluations completed ✅")
-
-# if __name__ == "__main__":
-#     asyncio.run(_amain())
-
-# if __name__ == "__main__":
-#     N_REPEAT = 5
-#     BASE_SEED = 42
-#     for run_id in range(N_REPEAT):
-#         print(f"\n\n===== 🌟 Run {run_id + 1}/{N_REPEAT} =====")
-
-#         # 改变 seed
-#         SEED = BASE_SEED + run_id * 1000
-#         print(f"[INFO] Using seed={SEED}")
-
-#         asyncio.run(_amain())
 
 if __name__ == "__main__":
-    N_REPEAT = 4  # 想跑几次就填几次
+    N_REPEAT = 1
     for run_id in range(N_REPEAT):
         print(f"\n\n===== 🌟 Run {run_id + 1}/{N_REPEAT} =====")
         asyncio.run(_amain())
-
-# if __name__ == "__main__":
-#     N_REPEAT = 7
-#     HORIZON_LIST = [10,13,17,20,22,25,27]
-#     for run_id in range(N_REPEAT):
-#         print(f"\n\n===== 🌟 Run {run_id + 1}/{N_REPEAT} =====")
-
-#         # 改变 horizon
-#         HORIZON = HORIZON_LIST[run_id]
-#         print(f"[INFO] Using horizon={HORIZON}")
-
-#         asyncio.run(_amain())
 
