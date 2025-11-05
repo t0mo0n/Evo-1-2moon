@@ -133,17 +133,19 @@ git lfs pull
 
 #### 2.1 Modify config.yaml
 
-You need to modify the config.yaml[config.yaml](Evo_1/dataset/config.yaml)
+You need to modify the [config.yaml](Evo_1/dataset/config.yaml)
 
 #### 2.2 Set the cache path
 
-You need to change the cache path [cache_dir](Evo_1/dataset/lerobot_dataset_pretrain_mp.py)
+You need to change the [cache_dir](Evo_1/dataset/lerobot_dataset_pretrain_mp.py)
 
 #### 3 Start Training
 
 We only train the integration module and action expert in stage 1.
 
 If you are training with multiple GPU, set --num_processes to the GPU number
+
+You need to change the --run_name,--save_dir,--resume_path base on your own config.
 
 #### 3.1 Stage 1
 
