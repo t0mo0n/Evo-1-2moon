@@ -61,7 +61,9 @@ Modify the client port (Optional,default 9000):
 conda activate Evo1
 cd Evo_1
 python scripts/Evo1_server.py
+```
 
+```bash
 # Start Meta-World client (In terminal 2)
 conda activate metaworld
 cd MetaWorld_evaluation
@@ -89,6 +91,8 @@ pip install -r requirements.txt
 pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 --extra-index-url https://download.pytorch.org/whl/cu113
 
 pip install -e .
+
+pip install websockets
 ```
 
 #### 2 Run the weight and code
@@ -108,6 +112,9 @@ Modify the server port (Optional,default 9000):
 Modify the client port (Optional,default 9000):
 [Modify the client port](LIBERO_evaluation/libero_client_4tasks.py#L23)
 
+Modify the ckpt name
+[ckptname](LIBERO_evaluation/libero_client_4tasks.py#L24)
+
 #### 3 Run the simulation evaluation
 
 ```bash
@@ -116,6 +123,9 @@ conda activate Evo1
 cd Evo_1
 python scripts/Evo1_server.py
 
+```
+
+```bash
 # Start LIBERO client (In terminal 2)
 conda activate libero
 cd LIBERO_evaluation
@@ -167,7 +177,7 @@ cd Evo_1/
 accelerate launch  --num_processes 1 --num_machines 1 --deepspeed_config_file ds_config.json scripts/train.py --run_name Evo1_metaworld_dataset_v2.1_stage1 --action_head flowmatching --use_augmentation --lr 1e-5 --dropout 0.2 --weight_decay 1e-3 --batch_size 16 --image_size 448 --max_steps 5000 --log_interval 10 --ckpt_interval 2500 --warmup_steps 1000 --grad_clip_norm 1.0 --num_layers 8 --horizon 50  --finetune_action_head --disable_wandb  --vlm_name OpenGVLab/InternVL3-1B --dataset_config_path dataset/config.yaml --per_action_dim 24 --state_dim 24  --save_dir /home/dell/code/lintao/Evo1_700m_clean/checkpoints/Evo1_metaworld_dataset_v2.1_stage1
 ```
 
-#### 3.1 Stage 2
+#### 3.2 Stage 2
 
 We unfreeze the VLM in stage 2.
 
