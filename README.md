@@ -279,14 +279,11 @@ The key is to construct an observation dict and pass it to the server.
 
 ## 📚 Citation
 ```bash
-@misc{lin2025evo1lightweightvisionlanguageactionmodel,
-      title={Evo-1: Lightweight Vision-Language-Action Model with Preserved Semantic Alignment}, 
-      author={Tao Lin and Yilei Zhong and Yuxin Du and Jingjing Zhang and Jiting Liu and Yinxinyu Chen and Encheng Gu and Ziyan Liu and Hongyi Cai and Yanwen Zou and Lixing Zou and Zhaoye Zhou and Gen Li and Bo Zhao},
-      year={2025},
-      eprint={2511.04555},
-      archivePrefix={arXiv},
-      primaryClass={cs.RO},
-      url={https://arxiv.org/abs/2511.04555}, 
+@article{lin2025evo,
+  title={Evo-1: Lightweight Vision-Language-Action Model with Preserved Semantic Alignment},
+  author={Lin, Tao and Zhong, Yilei and Du, Yuxin and Zhang, Jingjing and Liu, Jiting and Chen, Yinxinyu and Gu, Encheng and Liu, Ziyan and Cai, Hongyi and Zou, Yanwen and others},
+  journal={arXiv preprint arXiv:2511.04555},
+  year={2025}
 }
 ```
 
