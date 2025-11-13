@@ -53,7 +53,8 @@ cd Evo_1
 
 pip install -r requirements.txt
 
-# You may need to reduce the MAX_JOBS to suit your computer
+# You may need to reduce MAX_JOBS to suit your computer
+# (!!! This is a critical step — skipping it may cause lower success rate or unstable robot motion !!!)
 MAX_JOBS=64 pip install -v flash-attn --no-build-isolation
 ```
 
