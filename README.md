@@ -3,9 +3,11 @@
 
 [![📄 Paper](https://img.shields.io/badge/arXiv-Paper-red)](https://arxiv.org/abs/2511.04555)  
 
-[![🤗 HuggingFace Models](https://img.shields.io/badge/HuggingFace-Models-yellow)](https://huggingface.co/MINT-SJTU/Evo-1/tree/main)  
+[![🤗 HuggingFace Models](https://img.shields.io/badge/HuggingFace-Evo1_MetaWorld_Model-yellow)](https://huggingface.co/MINT-SJTU/Evo1_MetaWorld/tree/main)  
 
-[![📦 Dataset](https://img.shields.io/badge/HuggingFace-Dataset_MetaWorld-orange)](https://huggingface.co/datasets/MINT-SJTU/Evo1_MetaWorld/tree/main)  
+[![🤗 HuggingFace Models](https://img.shields.io/badge/HuggingFace-Evo1_LIBERO_Model-yellow)](https://huggingface.co/MINT-SJTU/Evo1_LIBERO/tree/main) 
+
+[![📦 Dataset](https://img.shields.io/badge/HuggingFace-Dataset_MetaWorld-orange)](https://huggingface.co/datasets/MINT-SJTU/Evo1_MetaWorld_Dataset/tree/main)  
 
 
 [![🌍 Website](https://img.shields.io/badge/Github-Website-green)](https://mint-sjtu.github.io/Evo-1.io/)  
@@ -42,10 +44,12 @@ git clone https://github.com/MINT-SJTU/Evo-1.git
 cd Evo-1/
 # Create a Conda environment
 conda create -n Evo1 python=3.10 -y
+
 conda activate Evo1
 
 # Install requirements
 cd Evo_1
+
 pip install -r requirements.txt
 
 # You may need to reduce the MAX_JOBS to suit your computer
