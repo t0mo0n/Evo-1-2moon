@@ -74,7 +74,7 @@ pip install huggingface_hub
 ### 📥 2.1 Download Model Weight
 
 ```bash
-hf download MINT-SJTU/Evo1_MetaWorld --local-dir /path/to/where/you/want/to/save/model
+hf download MINT-SJTU/Evo1_MetaWorld --local-dir /path/to/save/checkpoint/
 ```
 
 
@@ -138,7 +138,7 @@ pip install huggingface_hub
 ### 📥 2.1 Download Model Weight
 
 ```bash
-hf download MINT-SJTU/Evo1_LIBERO --local-dir /path/to/where/you/want/to/save/model
+hf download MINT-SJTU/Evo1_LIBERO --local-dir /path/to/save/checkpoint/
 ```
 
 
