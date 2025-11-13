@@ -66,13 +66,16 @@ pip install metaworld
 pip install websockets
 pip install opencv-python
 pip install packaging
+pip install huggingface_hub
 ```
 
 ### 2️⃣ Model Preparation
 
 ### 📥 2.1 Download Model Weight
 
-[Meta-World Evaluation Checkpoint](https://huggingface.co/MINT-SJTU/Evo-1/tree/main/Evo1_Simulation_Benchmark_Checkpoints/MetaWorld/Evo1_MetaWorld_checkpoint)
+```bash
+hf download MINT-SJTU/Evo1_MetaWorld --local-dir /path/to/where/you/want/to/save/model
+```
 
 
 ### ✏️ 2.2 Modify config
@@ -126,13 +129,17 @@ pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 --e
 pip install -e .
 
 pip install websockets
+
+pip install huggingface_hub
 ```
 
 ### 2️⃣ Model Preparation
 
 ### 📥 2.1 Download Model Weight
 
-[LIBERO Evaluation Checkpoint](https://huggingface.co/MINT-SJTU/Evo-1/tree/main/Evo1_Simulation_Benchmark_Checkpoints/LIBERO/Evo1_LIBERO_checkpoint)
+```bash
+hf download MINT-SJTU/Evo1_LIBERO --local-dir /path/to/where/you/want/to/save/model
+```
 
 
 
