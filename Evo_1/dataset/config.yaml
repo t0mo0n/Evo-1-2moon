@@ -20,7 +20,7 @@ data_groups:
   # This is an example of how to configure the dataset path and view mapping for MetaWorld
   metaworld_sawyer:
     Evo1_MetaWorld:
-      path: /home/dell/code/lintao/Evo_1/Evo1_training_dataset/Evo1_MetaWorld
+      path: /home/dell/code/lintao/Evo_1/Evo1_training_dataset/Evo1_MetaWorld_Dataset
       view_map:
         image_1: observation.images.image
 

@@ -188,9 +188,9 @@ mkdir Evo1_training_dataset/
 
 cd Evo1_training_dataset/
 
-GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/datasets/MINT-SJTU/Evo1_MetaWorld
+GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/datasets/MINT-SJTU/Evo1_MetaWorld_Dataset
 
-cd Evo1_MetaWorld/
+cd Evo1_MetaWorld_Dataset/
 
 git lfs pull
 ```
