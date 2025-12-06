@@ -22,21 +22,42 @@ import pickle
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
 
-def compute_lerobot_normalization_stats_from_minmax(jsonl_path):
+def compute_lerobot_normalization_stats_from_minmax(jsonl_path, relative_path=None):
     state_mins, state_maxs = [], []
     action_mins, action_maxs = [], []
 
-    with open(jsonl_path, "r") as f:
-        for line in tqdm(f, desc="Extracting min/max"):
-            obj = json.loads(line)
-            stats = obj.get("stats", {})
-            try:
-                state_mins.append(stats["observation.state"]["min"])
-                state_maxs.append(stats["observation.state"]["max"])
-                action_mins.append(stats["action"]["min"])
-                action_maxs.append(stats["action"]["max"])
-            except Exception as e:
-                print(f"skipping abnormal line: {e}")
+    if relative_path is None:
+        with open(jsonl_path, "r") as f:
+            for line in tqdm(f, desc="Extracting min/max"):
+                obj = json.loads(line)
+                stats = obj.get("stats", {})
+                try:
+                    state_mins.append(stats["observation.state"]["min"])
+                    state_maxs.append(stats["observation.state"]["max"])
+                    action_mins.append(stats["action"]["min"])
+                    action_maxs.append(stats["action"]["max"])
+                except Exception as e:
+                    print(f"skipping abnormal line: {e}")
+    else:
+        with open(jsonl_path, "r") as f:
+            for line in tqdm(f, desc="Extracting min/max"):
+                obj = json.loads(line)
+                stats = obj.get("stats", {})
+                try:
+                    state_mins.append(stats["observation.state"]["min"])
+                    state_maxs.append(stats["observation.state"]["max"])
+                except Exception as e:
+                    print(f"skipping abnormal line: {e}")
+
+        with open(relative_path, "r") as f:
+            for line in tqdm(f, desc="Extracting relative action min/max"):
+                obj = json.loads(line)
+                stats = obj.get("stats", {})
+                try:
+                    action_mins.append(stats["action_relative"]["min"])
+                    action_maxs.append(stats["action_relative"]["max"])
+                except Exception as e:
+                    print(f"skipping abnormal line: {e}")
 
 
     state_min_global = np.min(np.array(state_mins), axis=0).tolist()
@@ -67,6 +88,8 @@ def merge_lerobot_stats(stats_list: List[Dict[str, Dict[str, List[float]]]]) -> 
 
 def _process_parquet_file_worker(args):
     parquet_path, arm_name, dataset_name, dataset_config, dataset_path, task_mapping, action_horizon, max_samples_per_file, cache_dir = args
+    
+    use_delta_action = dataset_config.get('use_delta_action', True)
     
     try:
         view_map = dataset_config.get('view_map', None)
@@ -101,6 +124,23 @@ def _process_parquet_file_worker(args):
             
             logging.info(f"build {cache_filename}")
             sub_df = df.iloc[i: i + action_horizon]
+            
+            # convert actions to relative actions from first state
+            init_state = sub_df.iloc[0].get("observation.state", None)
+            if use_delta_action:
+                actions = np.stack(sub_df["action"].to_list())
+                if init_state is not None:
+                    min_dim = min(len(init_state), actions.shape[1])
+                    init_state_broadcast = np.zeros_like(actions)
+                    init_state_broadcast[:, :min_dim] = init_state[:min_dim]
+                    relative_actions = actions - init_state_broadcast
+                else:
+                    logging.warning(f"File {parquet_path} at index {i} has no 'observation.state', actions will not be converted to relative.")
+                    relative_actions = actions
+                actions = relative_actions.tolist()
+            else:
+                actions = sub_df["action"].to_list()
+            
             video_paths = {}
             base_video_path = dataset_path / "videos" / parquet_path.parent.name
 
@@ -124,8 +164,8 @@ def _process_parquet_file_worker(args):
                 "arm_key": arm_name,
                 "dataset_key": dataset_name,
                 "prompt": prompt,
-                "state": sub_df.iloc[0].get("observation.state", None),
-                "action": [row["action"] for _, row in sub_df.iterrows()],
+                "state": init_state,
+                "action": actions,
                 "video_paths": video_paths,
                 "timestamp": sub_df.iloc[0].get("timestamp", None),
             }
@@ -237,13 +277,18 @@ class LeRobotDataset(Dataset):
      
                 stats_path = dataset_path / "meta" / "episodes_stats.jsonl"
                 stats_path_after_compute = dataset_path / "meta" / "stats.json"
+                use_delta_action = dataset_config.get('use_delta_action', True)
+                if use_delta_action:
+                    stat_relative_path = dataset_path / "meta" / "episodes_stats_action_relative.jsonl"
+                else:
+                    stat_relative_path = None
                 if stats_path_after_compute.exists():
                     print(f"already have stats file: {stats_path_after_compute}")
                     with open(stats_path_after_compute, "r") as f:
                         stats = json.load(f)
                     norm_arm_list.append(stats)
                 elif stats_path.exists():
-                    stats = compute_lerobot_normalization_stats_from_minmax(stats_path)
+                    stats = compute_lerobot_normalization_stats_from_minmax(stats_path, stat_relative_path)
                    
                     with open(stats_path_after_compute, "w") as f:
                         json.dump(stats, f, indent=4)

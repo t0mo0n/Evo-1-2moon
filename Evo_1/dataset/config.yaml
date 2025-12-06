@@ -12,6 +12,7 @@ data_groups:
   #       image_1: observation.images.image_1
   #       image_2: observation.images.image_2
   #       image_3: observation.images.image_3
+  #     use_delta_action: True  # Optional, default is True. If set to True, compute stats for relative actions.
 ################################################################################
 
 
