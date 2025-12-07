@@ -23,6 +23,10 @@ def compute_relative_action_stats_for_episode(parquet_path: Path, action_horizon
     """
     try:
         df = pd.read_parquet(parquet_path)
+        
+        last_row = df.iloc[-1:]  
+        padding_rows = pd.concat([last_row] * action_horizon, ignore_index=True)
+        df = pd.concat([df, padding_rows], ignore_index=True)
 
         if 'action' not in df.columns or 'observation.state' not in df.columns:
             logging.warning(f"列 'action' 或 'observation.state' 在文件 {parquet_path} 中未找到，跳过。")
