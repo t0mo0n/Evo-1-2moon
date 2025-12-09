@@ -193,7 +193,7 @@ def check_numerical_stability(step: int, **named_tensors) -> bool:
             return False
     return True
 
-def log_training_step(step, loss, total_norm, clipped_norm, scheduler, dataloader, accelerator):
+def log_training_step(step, loss, total_norm, clipped_norm, momentum_norm, scheduler, dataloader, accelerator):
     current_epoch = step / len(dataloader)
     if accelerator is None or accelerator.is_main_process:
         logging.info(f"Estimated Epoch: {current_epoch:.2f}")
@@ -203,14 +203,18 @@ def log_training_step(step, loss, total_norm, clipped_norm, scheduler, dataloade
             "loss": loss.item(),
             "current_epoch": current_epoch,
             "learning_rate": scheduler.get_last_lr()[0],
-            
+            "grad_norm/total": total_norm.item(),
+            "grad_norm/clipped": clipped_norm.item(),
+            "optimizer/momentum_norm": momentum_norm.item(),
         })
         swanlab.log({
             "step": step,
             "loss": loss.item(),
             "current_epoch": current_epoch,
             "learning_rate": scheduler.get_last_lr()[0],
-    
+            "grad_norm/total": total_norm.item(),
+            "grad_norm/clipped": clipped_norm.item(),
+            "optimizer/momentum_norm": momentum_norm.item(),
         })
 
 def save_checkpoint(save_dir, step, model_engine, loss, accelerator, config=None, norm_stats=None):
@@ -313,6 +317,27 @@ def get_and_clip_grad_norm(accelerator, model, loss, max_norm: float = 1.0):
             clipped_norm = torch.norm(torch.stack(clipped_grad_norms), 2)
 
     return total_norm, clipped_norm
+
+def get_optimizer_momentum_norm(optimizer: torch.optim.Optimizer) -> torch.Tensor:
+    """
+    compute L2 norm of optimizer momentum buffers (first order exp_avg for AdamW)
+    """
+    momentum_norms = []
+
+    for group in optimizer.param_groups:
+        for p in group['params']:
+            if p.grad is None:
+                continue
+            state = optimizer.state.get(p)
+            if state is not None and 'exp_avg' in state:
+                momentum_buffer = state['exp_avg']
+                momentum_norms.append(momentum_buffer.norm(2))
+
+    if not momentum_norms:
+        return torch.tensor(0.0)
+
+    total_momentum_norm = torch.norm(torch.stack(momentum_norms), 2)
+    return total_momentum_norm
 
 def build_param_groups(model, wd):
     decay, no_decay = [], []
@@ -490,7 +515,8 @@ def train(config):
             
             # === Logging ===
             if step % log_interval == 0:
-                log_training_step(step, loss, total_norm, clipped_norm, scheduler, dataloader, accelerator)
+                momentum_norm = get_optimizer_momentum_norm(optimizer)
+                log_training_step(step, loss, total_norm, clipped_norm, momentum_norm, scheduler, dataloader, accelerator)
    
             # === Save best checkpoint ===
             loss_value = loss.item()
