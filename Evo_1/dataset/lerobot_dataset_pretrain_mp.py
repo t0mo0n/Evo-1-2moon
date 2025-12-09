@@ -125,18 +125,19 @@ def _process_parquet_file_worker(args):
             logging.info(f"build {cache_filename}")
             sub_df = df.iloc[i: i + action_horizon]
             
-            # convert actions to relative actions from first state
+            # convert actions to relative actions from previous action
             init_state = sub_df.iloc[0].get("observation.state", None)
             if use_delta_action:
-                actions = np.stack(sub_df["action"].to_list())
+                actions_abs = np.stack(sub_df["action"].to_list())
                 if init_state is not None:
-                    min_dim = min(len(init_state), actions.shape[1])
-                    init_state_broadcast = np.zeros_like(actions)
-                    init_state_broadcast[:, :min_dim] = init_state[:min_dim]
-                    relative_actions = actions - init_state_broadcast
+                    min_dim = min(len(init_state), actions_abs.shape[1])
+                    padded_init_state = np.zeros(actions_abs.shape[1], dtype=actions_abs.dtype)
+                    padded_init_state[:min_dim] = init_state[:min_dim]
+                    states_and_actions = np.vstack([padded_init_state, actions_abs[:-1]])
+                    relative_actions = actions_abs - states_and_actions
                 else:
                     logging.warning(f"File {parquet_path} at index {i} has no 'observation.state', actions will not be converted to relative.")
-                    relative_actions = actions
+                    relative_actions = actions_abs
                 actions = relative_actions.tolist()
             else:
                 actions = sub_df["action"].to_list()

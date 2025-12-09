@@ -34,7 +34,6 @@ def compute_relative_action_stats_for_episode(parquet_path: Path, action_horizon
 
         all_relative_actions = []
         
-        # 模拟数据加载时的滑动窗口
         for i in range(len(df) - action_horizon + 1):
             sub_df = df.iloc[i : i + action_horizon]
             
@@ -43,11 +42,10 @@ def compute_relative_action_stats_for_episode(parquet_path: Path, action_horizon
 
             if init_state is not None:
                 min_dim = min(len(init_state), actions.shape[1])
-                
-                init_state_broadcast = np.zeros_like(actions)
-                init_state_broadcast[:, :min_dim] = init_state[:min_dim]
-                
-                relative_actions = actions - init_state_broadcast
+                padded_init_state = np.zeros(actions.shape[1], dtype=actions.dtype)
+                padded_init_state[:min_dim] = init_state[:min_dim]
+                states_and_actions = np.vstack([padded_init_state, actions[:-1]])
+                relative_actions = actions - states_and_actions
                 all_relative_actions.append(relative_actions)
             else:
                 logging.warning(f"文件 {parquet_path} 中索引 {i} 处缺少状态，无法计算相对动作。")
