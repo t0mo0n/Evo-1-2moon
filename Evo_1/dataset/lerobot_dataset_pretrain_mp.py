@@ -212,7 +212,7 @@ class LeRobotDataset(Dataset):
 
 
         if cache_dir is None:
-            self.cache_dir = Path("/home/dell/code/lintao/Evo_1/training_data_cache/")
+            self.cache_dir = Path("/home/tomoon/codes/Evo-VLA/train_data_cache")
         else:
             self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)

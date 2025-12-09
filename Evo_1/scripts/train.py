@@ -193,7 +193,7 @@ def check_numerical_stability(step: int, **named_tensors) -> bool:
             return False
     return True
 
-def log_training_step(step, loss, total_norm, clipped_norm, momentum_norm, scheduler, dataloader, accelerator):
+def log_training_step(step, loss, total_norm, momentum_norm, scheduler, dataloader, accelerator):
     current_epoch = step / len(dataloader)
     if accelerator is None or accelerator.is_main_process:
         logging.info(f"Estimated Epoch: {current_epoch:.2f}")
@@ -203,8 +203,7 @@ def log_training_step(step, loss, total_norm, clipped_norm, momentum_norm, sched
             "loss": loss.item(),
             "current_epoch": current_epoch,
             "learning_rate": scheduler.get_last_lr()[0],
-            "grad_norm/total": total_norm.item(),
-            "grad_norm/clipped": clipped_norm.item(),
+            "grad_norm/total": total_norm,
             "optimizer/momentum_norm": momentum_norm.item(),
         })
         swanlab.log({
@@ -212,8 +211,7 @@ def log_training_step(step, loss, total_norm, clipped_norm, momentum_norm, sched
             "loss": loss.item(),
             "current_epoch": current_epoch,
             "learning_rate": scheduler.get_last_lr()[0],
-            "grad_norm/total": total_norm.item(),
-            "grad_norm/clipped": clipped_norm.item(),
+            "grad_norm/total": total_norm,
             "optimizer/momentum_norm": momentum_norm.item(),
         })
 
@@ -293,50 +291,39 @@ def load_checkpoint_with_deepspeed(model_engine, load_dir, accelerator, tag="ste
 
     
 
-def get_and_clip_grad_norm(accelerator, model, loss, max_norm: float = 1.0):
 
-    if hasattr(accelerator, "get_global_grad_norm") and hasattr(accelerator, "clip_grad_norm_"):
-       
-        total_norm = accelerator.get_global_grad_norm()
-        accelerator.clip_grad_norm_(model.parameters(), max_norm)
-        clipped_norm = accelerator.get_global_grad_norm()
-    else:
- 
-        grad_norms = [p.grad.norm(2) for p in model.parameters() if p.grad is not None]
-        if len(grad_norms) == 0:
-            total_norm = torch.tensor(0.0, device=loss.device)
-        else:
-            total_norm = torch.norm(torch.stack(grad_norms), 2)
+def get_and_clip_grad_norm(accelerator, model, max_norm: float = 1.0):
+    """
+    Clips gradient norm and returns the total norm before clipping.
+    """
+    total_norm = accelerator.clip_grad_norm_(model.parameters(), max_norm)
+    return total_norm
 
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
-
-        clipped_grad_norms = [p.grad.norm(2) for p in model.parameters() if p.grad is not None]
-        if len(clipped_grad_norms) == 0:
-            clipped_norm = torch.tensor(0.0, device=loss.device)
-        else:
-            clipped_norm = torch.norm(torch.stack(clipped_grad_norms), 2)
-
-    return total_norm, clipped_norm
-
-def get_optimizer_momentum_norm(optimizer: torch.optim.Optimizer) -> torch.Tensor:
+def get_optimizer_momentum_norm(optimizer: torch.optim.Optimizer, accelerator) -> torch.Tensor:
     """
     compute L2 norm of optimizer momentum buffers (first order exp_avg for AdamW)
+    Works with accelerate-wrapped optimizers.
     """
+    # 更可靠的方式：直接访问 optimizer 的内部
+    if hasattr(optimizer, 'optimizer'):
+        # AcceleratedOptimizer 包装了原始优化器
+        base_optimizer = optimizer.optimizer
+        print("Detected AcceleratedOptimizer wrapper.")
+    else:
+        base_optimizer = optimizer
+    
     momentum_norms = []
-
-    for group in optimizer.param_groups:
+    for group in base_optimizer.param_groups:
         for p in group['params']:
-            if p.grad is None:
-                continue
-            state = optimizer.state.get(p)
+            state = base_optimizer.state.get(p)
             if state is not None and 'exp_avg' in state:
                 momentum_buffer = state['exp_avg']
-                momentum_norms.append(momentum_buffer.norm(2))
+                momentum_norms.append(momentum_buffer.norm(2).item())
 
     if not momentum_norms:
         return torch.tensor(0.0)
 
-    total_momentum_norm = torch.norm(torch.stack(momentum_norms), 2)
+    total_momentum_norm = torch.tensor(momentum_norms).norm(2)
     return total_momentum_norm
 
 def build_param_groups(model, wd):
@@ -508,15 +495,16 @@ def train(config):
             accelerator.backward(loss)
 
             # === Clip grad norm ===
-            total_norm, clipped_norm = get_and_clip_grad_norm(accelerator, model, loss, max_norm)
+            # total_norm, clipped_norm = get_and_clip_grad_norm(accelerator, model, loss, max_norm)
+            total_norm = get_and_clip_grad_norm(accelerator, model, max_norm)
 
             optimizer.step()
             scheduler.step()
             
             # === Logging ===
             if step % log_interval == 0:
-                momentum_norm = get_optimizer_momentum_norm(optimizer)
-                log_training_step(step, loss, total_norm, clipped_norm, momentum_norm, scheduler, dataloader, accelerator)
+                momentum_norm = get_optimizer_momentum_norm(optimizer, accelerator)
+                log_training_step(step, loss, total_norm, momentum_norm, scheduler, dataloader, accelerator)
    
             # === Save best checkpoint ===
             loss_value = loss.item()
