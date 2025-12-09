@@ -18,13 +18,20 @@ data_groups:
 
 
 
-  # This is an example of how to configure the dataset path and view mapping for MetaWorld
-  metaworld_sawyer:
-    Evo1_MetaWorld:
-      path: /home/dell/code/lintao/Evo_1/Evo1_training_dataset/Evo1_MetaWorld_Dataset
+  # # This is an example of how to configure the dataset path and view mapping for MetaWorld
+  # metaworld_sawyer:
+  #   Evo1_MetaWorld:
+  #     path: /home/dell/code/lintao/Evo_1/Evo1_training_dataset/Evo1_MetaWorld_Dataset
+  #     view_map:
+  #       image_1: observation.images.image
+  rlbench_franka:
+    rlbench_close_box:
+      path: /home/tomoon/datasets/Rlbench/close_box/close_box_25_08_03_lerobotv21
       view_map:
-        image_1: observation.images.image
-
+        image_1: observation.images.image_1
+        image_2: observation.images.image_2
+        image_3: observation.images.image_3
+      use_delta_action: True
 
 
   # This is an example of how to configure multi-task training for LIBERO.
