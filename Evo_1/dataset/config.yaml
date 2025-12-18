@@ -3,6 +3,8 @@ max_action_dim: 24
 max_state_dim: 24
 max_views: 3
 
+normalization_type: bounds
+
 data_groups:
   ##############################################################################
   # Your embodiment_name:
@@ -26,7 +28,7 @@ data_groups:
   #       image_1: observation.images.image
   rlbench_franka:
     rlbench_close_box:
-      path: F:\E-AI\dataset\rlbench\close_box_25_08_03_lerobotv21
+      path: /home/tomoon/datasets/Rlbench/close_box/close_box_25_08_03_lerobotv21
       view_map:
         image_1: observation.images.image_1
         image_2: observation.images.image_2

@@ -267,6 +267,7 @@ class LeRobotDataset(Dataset):
         self.episodes = []
         self.tasks = {}
         self.normalization_type = self.config.get("normalization_type", NormalizationType.BOUNDS.value)
+        logging.info(f"Using normalization type: {self.normalization_type}")
         norm_stats_list = []
 
         # for arms
