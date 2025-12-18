@@ -18,9 +18,16 @@ from collections.abc import Iterable
 import multiprocessing as mp
 import logging
 import pickle
+from enum import Enum
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
+
+class NormalizationType(str, Enum):
+    # fmt: off
+    NORMAL = "normal"               # Normalize to Mean = 0, Stdev = 1
+    BOUNDS = "bounds"               # Normalize to Interval = [-1, 1]
+    BOUNDS_Q99 = "bounds_q99" 
 
 def compute_lerobot_normalization_stats_from_minmax(jsonl_path, relative_path=None):
     state_mins, state_maxs = [], []
@@ -71,19 +78,34 @@ def compute_lerobot_normalization_stats_from_minmax(jsonl_path, relative_path=No
     }
 
 def merge_lerobot_stats(stats_list: List[Dict[str, Dict[str, List[float]]]]) -> Dict:
-    state_mins = [np.array(d["observation.state"]["min"]) for d in stats_list]
-    state_maxs = [np.array(d["observation.state"]["max"]) for d in stats_list]
-    action_mins = [np.array(d["action"]["min"]) for d in stats_list]
-    action_maxs = [np.array(d["action"]["max"]) for d in stats_list]
-    state_min_global = np.min(np.stack(state_mins), axis=0).tolist()
-    state_max_global = np.max(np.stack(state_maxs), axis=0).tolist()
-    action_min_global = np.min(np.stack(action_mins), axis=0).tolist()
-    action_max_global = np.max(np.stack(action_maxs), axis=0).tolist()
+    if not stats_list:
+        raise ValueError("stats_list cannot be empty when merging normalization stats")
 
-    return {
-        "observation.state": {"min": state_min_global, "max": state_max_global},
-        "action": {"min": action_min_global, "max": action_max_global}
-    }
+    merged = {}
+    for space in ["observation.state", "action"]:
+        merged[space] = {}
+        metric_keys = set()
+        for stats in stats_list:
+            metric_keys.update(stats.get(space, {}).keys())
+
+        for metric in metric_keys:
+            tensors = [np.array(stats[space][metric]) for stats in stats_list if metric in stats.get(space, {})]
+            if not tensors:
+                continue
+            stacked = np.stack(tensors)
+
+            if metric in {"min", "q01"}:
+                merged_val = np.min(stacked, axis=0)
+            elif metric in {"max", "q99"}:
+                merged_val = np.max(stacked, axis=0)
+            elif metric in {"mean", "std"}:
+                merged_val = np.mean(stacked, axis=0)
+            else:
+                merged_val = stacked[0]
+
+            merged[space][metric] = merged_val.tolist()
+
+    return merged
 
 
 def _process_parquet_file_worker(args):
@@ -244,6 +266,7 @@ class LeRobotDataset(Dataset):
      
         self.episodes = []
         self.tasks = {}
+        self.normalization_type = self.config.get("normalization_type", NormalizationType.BOUNDS.value)
         norm_stats_list = []
 
         # for arms
@@ -514,12 +537,13 @@ class LeRobotDataset(Dataset):
         
 
         state = torch.tensor(item["state"], dtype=torch.float32)
-        device = state.device
-        state_min = torch.tensor(norm_stats["observation.state"]["min"], dtype=torch.float32, device=device)
-        state_max = torch.tensor(norm_stats["observation.state"]["max"], dtype=torch.float32, device=device)
-        
-        state = 2 * (state - state_min) / (state_max - state_min + 1e-8) - 1
-        state = torch.clamp(state, -1.0, 1.0)  
+        state = self._normalize_tensor(
+            tensor=state,
+            stats_dict=norm_stats["observation.state"],
+            stats_name="observation.state",
+            normalization_type=self.normalization_type,
+            apply_zero_mask=False,
+        )
 
         state_padded, state_mask = self._pad_tensor(
             state, self.max_state_dim
@@ -531,11 +555,13 @@ class LeRobotDataset(Dataset):
 
   
         action = torch.from_numpy(np.stack(item["action"])).float()
-        device = action.device
-        action_min = torch.tensor(norm_stats["action"]["min"], dtype=torch.float32, device=device)
-        action_max = torch.tensor(norm_stats["action"]["max"], dtype=torch.float32, device=device)
-        action = 2 * (action - action_min.unsqueeze(0)) / (action_max.unsqueeze(0) - action_min.unsqueeze(0) + 1e-8) - 1
-        action = torch.clamp(action, -1.0, 1.0)
+        action = self._normalize_tensor(
+            tensor=action,
+            stats_dict=norm_stats["action"],
+            stats_name="action",
+            normalization_type=self.normalization_type,
+            apply_zero_mask=True,
+        )
 
         action_padded, action_mask = self._pad_tensor(
             action, self.max_action_dim
@@ -554,3 +580,56 @@ class LeRobotDataset(Dataset):
             "embodiment_id": torch.tensor(embodiment_id, dtype=torch.long)
         }
 
+    def _normalize_tensor(self, tensor, stats_dict, stats_name, normalization_type, apply_zero_mask=False):
+        """Normalize tensor according to stats and requested normalization type."""
+        eps = 1e-8
+        device = tensor.device
+
+        def _stat_tensor(key):
+            values = stats_dict.get(key)
+            if values is None:
+                return None
+            return torch.tensor(values, dtype=torch.float32, device=device)
+
+        if normalization_type == NormalizationType.NORMAL:
+            mean = _stat_tensor("mean")
+            std = _stat_tensor("std")
+            if mean is None or std is None:
+                raise ValueError(
+                    f"Missing mean/std stats for {stats_name}; please regenerate stats.json with these metrics."
+                )
+            return (tensor - mean) / (std + eps)
+
+        if normalization_type == NormalizationType.BOUNDS:
+            low = _stat_tensor("min")
+            high = _stat_tensor("max")
+            if low is None or high is None:
+                raise ValueError(f"Missing min/max stats for {stats_name}; cannot apply bounds normalization.")
+        elif normalization_type == NormalizationType.BOUNDS_Q99:
+            low = _stat_tensor("q01")
+            high = _stat_tensor("q99")
+            if low is None or high is None:
+                logging.warning(
+                    "Missing q01/q99 for %s, falling back to min/max bounds normalization.",
+                    stats_name,
+                )
+                low = _stat_tensor("min")
+                high = _stat_tensor("max")
+            if low is None or high is None:
+                raise ValueError(
+                    f"Missing q01/q99 (or min/max fallback) for {stats_name}; cannot apply bounds_q99 normalization."
+                )
+        else:
+            raise ValueError(f"Unsupported normalization type: {normalization_type}")
+
+        diff = high - low
+        normalized = 2 * (tensor - low) / (diff + eps) - 1
+        normalized = torch.clamp(normalized, -1.0, 1.0)
+
+        if apply_zero_mask:
+            zeros_mask = diff.abs() < eps
+            while zeros_mask.dim() < normalized.dim():
+                zeros_mask = zeros_mask.unsqueeze(0)
+            normalized = torch.where(zeros_mask, torch.zeros_like(normalized), normalized)
+
+        return normalized

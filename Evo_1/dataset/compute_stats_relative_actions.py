@@ -67,6 +67,8 @@ def compute_relative_action_stats_for_episode(parquet_path: Path, action_horizon
             "max": np.max(all_actions_np, axis=0).tolist(),
             "mean": np.mean(all_actions_np, axis=0).tolist(),
             "std": np.std(all_actions_np, axis=0).tolist(),
+            "q01": np.quantile(all_actions_np, 0.01, axis=0).tolist(),
+            "q99": np.quantile(all_actions_np, 0.99, axis=0).tolist(),
         }
 
         return {
@@ -90,6 +92,7 @@ def process_dataset(dataset_path: Path, action_horizon: int):
     data_dir = dataset_path / "data"
     meta_dir = dataset_path / "meta"
     output_path = meta_dir / "episodes_stats_action_relative.jsonl"
+    global_stats_path = meta_dir / "stats_relative_action_global.json"
 
     if not data_dir.exists():
         logging.warning(f"数据目录 {data_dir} 不存在，跳过数据集 {dataset_path.name}。")
@@ -103,14 +106,39 @@ def process_dataset(dataset_path: Path, action_horizon: int):
         return
 
     logging.info(f"正在处理数据集 '{dataset_path.name}' 中的 {len(parquet_files)} 个 episodes...")
+    
+    global_min = None
+    global_max = None
 
     with open(output_path, 'w') as f:
         for parquet_file in tqdm(parquet_files, desc=f"计算 {dataset_path.name} 的统计数据"):
             episode_stats = compute_relative_action_stats_for_episode(parquet_file, action_horizon)
             if episode_stats:
                 f.write(json.dumps(episode_stats) + '\n')
+                ep_min = np.array(episode_stats["stats"]["action_relative"]["min"])
+                ep_max = np.array(episode_stats["stats"]["action_relative"]["max"])
+
+                if global_min is None:
+                    global_min = ep_min
+                    global_max = ep_max
+                else:
+                    global_min = np.minimum(global_min, ep_min)
+                    global_max = np.maximum(global_max, ep_max)
 
     logging.info(f"相对动作统计数据已保存至: {output_path}")
+    
+    if global_min is not None:
+        global_stats = {
+            "action_relative": {
+                "min": global_min.tolist(),
+                "max": global_max.tolist()
+            }
+        }
+        with open(global_stats_path, 'w') as f:
+            json.dump(global_stats, f, indent=2)
+        logging.info(f"全局相对动作统计数据(min/max)已保存至: {global_stats_path}")
+    else:
+        logging.warning("未计算出任何有效的全局相对动作统计数据。")
 
 def main():
     parser = argparse.ArgumentParser(description="为LeRobot数据集计算相对于初始状态的相对动作的统计数据。")

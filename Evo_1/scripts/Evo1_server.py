@@ -3,6 +3,7 @@
 import sys
 import os
 import asyncio
+import logging
 import websockets
 import numpy as np
 import cv2
@@ -16,48 +17,123 @@ from fvcore.nn import FlopCountAnalysis
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from scripts.Evo1 import EVO1
+from dataset.lerobot_dataset_pretrain_mp import NormalizationType
 
 
 
 class Normalizer:
-    def __init__(self, stats_or_path):
+    def __init__(self, stats_or_path, normalization_type: NormalizationType = NormalizationType.BOUNDS):
         if isinstance(stats_or_path, str):
             with open(stats_or_path, "r") as f:
                 stats = json.load(f)
         else:
             stats = stats_or_path
 
-        def pad_to_24(x):
-            x = torch.tensor(x, dtype=torch.float32)
-            if x.shape[0] < 24:
-                pad = torch.zeros(24 - x.shape[0], dtype=torch.float32)
-                x = torch.cat([x, pad], dim=0)
-            elif x.shape[0] > 24:
-                raise ValueError(f"Input length {x.shape[0]} exceeds expected 24")
-            return x
-
         if len(stats) != 1:
             raise ValueError(f"norm_stats.json should contain only one robot key, but: {list(stats.keys())}")
+
+        if isinstance(normalization_type, str):
+            normalization_type = NormalizationType(normalization_type)
+        self.normalization_type = normalization_type
+        print(f"Using normalization type: {self.normalization_type}")
+        self.target_dim = 24
 
         robot_key = list(stats.keys())[0]
         robot_stats = stats[robot_key]
 
-        self.state_min = pad_to_24(robot_stats["observation.state"]["min"])
-        self.state_max = pad_to_24(robot_stats["observation.state"]["max"])
-        self.action_min = pad_to_24(robot_stats["action"]["min"])
-        self.action_max = pad_to_24(robot_stats["action"]["max"])
+        self.state_stats = self._prepare_stats(robot_stats.get("observation.state", {}), "observation.state")
+        self.action_stats = self._prepare_stats(robot_stats.get("action", {}), "action")
+
+    def _pad_vector(self, values, name):
+        tensor = torch.tensor(values, dtype=torch.float32)
+        length = tensor.shape[0]
+        if length < self.target_dim:
+            pad = torch.zeros(self.target_dim - length, dtype=torch.float32)
+            tensor = torch.cat([tensor, pad], dim=0)
+        elif length > self.target_dim:
+            raise ValueError(f"{name} length {length} exceeds expected {self.target_dim}")
+        return tensor
+
+    def _prepare_stats(self, stats_dict, stats_name):
+        prepared = {}
+        for key, values in stats_dict.items():
+            prepared[key] = self._pad_vector(values, f"{stats_name}.{key}")
+        return prepared
+
+    def _stat_to_device(self, stats_dict, key, device, dtype):
+        tensor = stats_dict.get(key)
+        if tensor is None:
+            return None
+        return tensor.to(device=device, dtype=dtype)
+
+    def _normalize_tensor(self, tensor: torch.Tensor, stats_dict, clamp: bool) -> torch.Tensor:
+        eps = 1e-8
+        device, dtype = tensor.device, tensor.dtype
+        norm_type = self.normalization_type
+
+        if norm_type == NormalizationType.NORMAL:
+            mean = self._stat_to_device(stats_dict, "mean", device, dtype)
+            std = self._stat_to_device(stats_dict, "std", device, dtype)
+            if mean is None or std is None:
+                raise ValueError("Normal normalization selected but mean/std are missing in norm_stats.json")
+            return (tensor - mean) / (std + eps)
+
+        low_key, high_key = ("min", "max")
+        if norm_type == NormalizationType.BOUNDS_Q99:
+            low_key, high_key = ("q01", "q99")
+
+        low = self._stat_to_device(stats_dict, low_key, device, dtype)
+        high = self._stat_to_device(stats_dict, high_key, device, dtype)
+
+        if (low is None or high is None) and norm_type == NormalizationType.BOUNDS_Q99:
+            logging.warning("Missing q01/q99 stats; falling back to min/max bounds normalization.")
+            low = self._stat_to_device(stats_dict, "min", device, dtype)
+            high = self._stat_to_device(stats_dict, "max", device, dtype)
+
+        if low is None or high is None:
+            raise ValueError("Bounds normalization selected but min/max stats are missing in norm_stats.json")
+
+        normalized = 2 * (tensor - low) / (high - low + eps) - 1
+        if clamp:
+            normalized = torch.clamp(normalized, -1.0, 1.0)
+        return normalized
+
+    def _denormalize_tensor(self, tensor: torch.Tensor, stats_dict) -> torch.Tensor:
+        eps = 1e-8
+        device, dtype = tensor.device, tensor.dtype
+        norm_type = self.normalization_type
+
+        if norm_type == NormalizationType.NORMAL:
+            mean = self._stat_to_device(stats_dict, "mean", device, dtype)
+            std = self._stat_to_device(stats_dict, "std", device, dtype)
+            if mean is None or std is None:
+                raise ValueError("Normal denormalization requested but mean/std stats are missing")
+            return tensor * (std + eps) + mean
+
+        low_key, high_key = ("min", "max")
+        if norm_type == NormalizationType.BOUNDS_Q99:
+            low_key, high_key = ("q01", "q99")
+
+        low = self._stat_to_device(stats_dict, low_key, device, dtype)
+        high = self._stat_to_device(stats_dict, high_key, device, dtype)
+
+        if (low is None or high is None) and norm_type == NormalizationType.BOUNDS_Q99:
+            logging.warning("Missing q01/q99 stats; falling back to min/max bounds denormalization.")
+            low = self._stat_to_device(stats_dict, "min", device, dtype)
+            high = self._stat_to_device(stats_dict, "max", device, dtype)
+
+        if low is None or high is None:
+            raise ValueError("Bounds denormalization requested but min/max stats are missing")
+
+        return (tensor + 1.0) / 2.0 * (high - low + eps) + low
 
     def normalize_state(self, state: torch.Tensor) -> torch.Tensor:
-        state_min = self.state_min.to(state.device, dtype=state.dtype)
-        state_max = self.state_max.to(state.device, dtype=state.dtype)
-        return torch.clamp(2 * (state - state_min) / (state_max - state_min + 1e-8) - 1, -1.0, 1.0)
+        return self._normalize_tensor(state, self.state_stats, clamp=True)
 
     def denormalize_action(self, action: torch.Tensor) -> torch.Tensor:
-        action_min = self.action_min.to(action.device, dtype=action.dtype)
-        action_max = self.action_max.to(action.device, dtype=action.dtype)
         if action.ndim == 1:
             action = action.view(1, -1)
-        return (action + 1.0) / 2.0 * (action_max - action_min + 1e-8) + action_min
+        return self._denormalize_tensor(action, self.action_stats)
 
 
 def load_model_and_normalizer(ckpt_dir):
@@ -75,7 +151,8 @@ def load_model_and_normalizer(ckpt_dir):
     model.load_state_dict(checkpoint["module"], strict=True)
     model = model.to("cuda")
 
-    normalizer = Normalizer(stats)
+    normalization_type = config.get("normalization_type", NormalizationType.BOUNDS.value)
+    normalizer = Normalizer(stats, normalization_type=normalization_type)
     return model, normalizer
 
 
