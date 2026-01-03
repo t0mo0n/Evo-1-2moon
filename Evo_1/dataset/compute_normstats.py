@@ -9,6 +9,7 @@ import yaml
 from pathlib import Path
 from statistics import mean
 from typing import Dict, Iterable, List, Tuple
+from tqdm import tqdm
 
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
@@ -54,7 +55,7 @@ def compute_normstats(dataset_path: Path, use_delta_actions: bool = True, action
     else:
         print("Computing absolute action statistics...")
 
-    for pq_path in parquet_files:
+    for pq_path in tqdm(parquet_files, desc=f"Processing {dataset_path.name}", unit="ep"):
         table = pq.read_table(pq_path, columns=["action", "observation.state"])
         frames_here = table.num_rows
         total_frames += frames_here
@@ -251,12 +252,6 @@ def main() -> None:
         help="指向数据集配置文件（如 config.yaml）的路径。",
     )
     parser.add_argument(
-        "--use_delta_actions",
-        type=str2bool,
-        default=True,
-        help="使用相对于初始状态的相对动作的统计数据。",
-    )
-    parser.add_argument(
         "--action_horizon",
         type=int,
         default=50,
@@ -279,7 +274,8 @@ def main() -> None:
                 continue
             
             dataset_path = Path(path_str)
-            compute_normstats(dataset_path, use_delta_actions=args.use_delta_actions, action_horizon=args.action_horizon)
+            use_delta = dataset_config.get('use_delta_action', True)
+            compute_normstats(dataset_path, use_delta_actions=use_delta, action_horizon=args.action_horizon)
 
 
 if __name__ == "__main__":
