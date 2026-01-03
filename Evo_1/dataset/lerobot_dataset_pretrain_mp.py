@@ -92,7 +92,26 @@ def merge_lerobot_stats(stats_list: List[Dict[str, Dict[str, List[float]]]]) -> 
             tensors = [np.array(stats[space][metric]) for stats in stats_list if metric in stats.get(space, {})]
             if not tensors:
                 continue
-            stacked = np.stack(tensors)
+                        
+            # auto align dimensions by padding
+            max_dim = max(t.shape[0] for t in tensors)
+            aligned_tensors = []
+            for t in tensors:
+                if t.shape[0] < max_dim:
+                    pad_width = max_dim - t.shape[0]
+                    if metric in {"min", "q01"}:
+                        pad_val = np.inf
+                    elif metric in {"max", "q99"}:
+                        pad_val = -np.inf
+                    else:
+                        pad_val = 0.0
+                    
+                    padded = np.pad(t, (0, pad_width), constant_values=pad_val)
+                    aligned_tensors.append(padded)
+                else:
+                    aligned_tensors.append(t)
+            
+            stacked = np.stack(aligned_tensors)
 
             if metric in {"min", "q01"}:
                 merged_val = np.min(stacked, axis=0)
@@ -584,12 +603,24 @@ class LeRobotDataset(Dataset):
         """Normalize tensor according to stats and requested normalization type."""
         eps = 1e-8
         device = tensor.device
+        input_dim = tensor.shape[-1]
 
         def _stat_tensor(key):
             values = stats_dict.get(key)
             if values is None:
                 return None
-            return torch.tensor(values, dtype=torch.float32, device=device)
+            stat_t = torch.tensor(values, dtype=torch.float32, device=device)
+            
+            if stat_t.shape[-1] > input_dim:
+                stat_t = stat_t[..., :input_dim]
+            elif stat_t.shape[-1] < input_dim:
+                raise ValueError(
+                    f"Stats dimension ({stat_t.shape[-1]}) is smaller than "
+                    f"tensor dimension ({input_dim}) for {stats_name}.{key}"
+                )
+            # ------------------------
+            
+            return stat_t
 
         if normalization_type == NormalizationType.NORMAL:
             mean = _stat_tensor("mean")

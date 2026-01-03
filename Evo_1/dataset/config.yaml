@@ -4,8 +4,6 @@ max_state_dim: 24
 max_views: 3
 normalization_type: bounds # options: bounds, normal, bounds_q99
 
-normalization_type: bounds
-
 data_groups:
   franka_joint_angle:
     droid_joint_angle_w_last:
@@ -104,7 +102,14 @@ data_groups:
         image_3: observation.images.image_5
       use_delta_action: True
 
-  franka_ee_delta_pose:
+  franka_joint_angle_delta:
+    berkley_rpt_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/berkeley_rpt_lerobot/berkeley_rpt_lerobot
+      view_map:
+        image_1: observation.images.hand_image
+      use_delta_action: False
+
+  franka_ee_pose_delta:
     libero_10_no_noops_lerobot:
       path: /share/taolin/datasets/libero/libero_10_no_noops_1.0.0_lerobot
       view_map:
@@ -133,6 +138,78 @@ data_groups:
         image_2: observation.images.wrist_image
       use_delta_action: False
 
+    austin_buds_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/austin_buds_dataset_lerobot
+      view_map:
+        image_1: observation.images.image
+        image_2: observation.images.wrist_image
+      use_delta_action: False
+
+    austin_sirius_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/austin_sirius_dataset_lerobot/austin_sirius_dataset_lerobot
+      view_map:
+        image_1: observation.images.image
+        image_2: observation.images.wrist_image
+      use_delta_action: False
+
+    berkeley_cable_routing_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/berkeley_cable_routing_lerobot/berkeley_cable_routing_lerobot
+      view_map:
+        image_1: observation.images.image
+        image_2: observation.images.wrist45_image
+        image_3: observation.images.top_image
+      use_delta_action: False
+
+    cmu_play_fusion_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/cmu_play_fusion_lerobot/cmu_play_fusion_lerobot
+      view_map:
+        image_1: observation.images.image
+      use_delta_action: False
+
+    fmb_dataset_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/fmb_dataset_lerobot/fmb_dataset_lerobot
+      view_map:
+        image_1: observation.images.image_side_1
+        image_2: observation.images.image_wrist_1
+        image_3: observation.images.image_side_2
+      use_delta_action: False
+
+    furniture_bench_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/furniture_bench_dataset_lerobot/furniture_bench_dataset_lerobot
+      view_map:
+        image_1: observation.images.image
+        image_2: observation.images.wrist_image
+      use_delta_action: False
+
+    stanford_hydra_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/stanford_hydra_dataset_lerobot/stanford_hydra_dataset_lerobot
+      view_map:
+        image_1: observation.images.image
+        image_2: observation.images.wrist_image
+      use_delta_action: False
+
+    taco_play_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/taco_play_lerobot/taco_play_lerobot
+      view_map:
+        image_1: observation.images.rgb_static
+        image_2: observation.images.rgb_gripper
+      use_delta_action: False
+
+    utaustin_mutex_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/utaustin_mutex_lerobot/utaustin_mutex_lerobot
+      view_map:
+        image_1: observation.images.image
+        image_2: observation.images.wrist_image
+      use_delta_action: False
+
+    viola_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/viola_lerobot/viola_lerobot
+      view_map:
+        image_1: observation.images.agentview_rgb
+        image_2: observation.images.eye_in_hand_rgb
+      use_delta_action: False
+
+  windowsx_ee_pose_delta:
     bridge_orig_lerobotv21:
       path: /share/taolin/datasets/pretraining_data/bridge_orig_lerobot
       view_map:
@@ -149,11 +226,52 @@ data_groups:
         image_2: observation.images.rgb_gripper
       use_delta_action: True
 
-  swayer_ee_pose:
+    iamlab_cmu_pickup_insert_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/iamlab_cmu_pickup_insert_lerobot/iamlab_cmu_pickup_insert_lerobot
+      view_map:
+        image_1: observation.images.image
+        image_2: observation.images.wrist_image
+      use_delta_action: True
+
+    toto_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/toto_lerobot/toto_lerobot
+      view_map:
+        image_1: observation.images.image
+      use_delta_action: True
+
+  swayer_ee_pose_delta:
     meta_world_lerobotv21:
       path: /share/taolin/datasets/meta_world/metaworld_dataset_v2.1
       view_map:
         image_1: observation.images.image
+      use_delta_action: False
+
+  google_robot_ee_pose_delta:
+    fractal_220817_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/fractal/fractal20220817_data_lerobot
+      view_map:
+        image_1: observation.images.image
+      use_delta_action: False
+
+  kuka_iiwa_ee_pose_delta:
+    kuka_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/kuka/kuka_lerobot
+      view_map:
+        image_1: observation.images.image
+      use_delta_action: False
+
+  xarm_joint_angle_delta:
+    berkeley_mvp_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/berkeley_mvp_lerobot/berkeley_mvp_lerobot
+      view_map:
+        image_1: observation.images.hand_image
+      use_delta_action: False
+
+  xarm_ee_pose_delta:
+    language_table_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/language_table_v2/language_table_lerobot
+      view_map:
+        image_1: observation.images.rgb
       use_delta_action: False
     
   aloha_agilex_twin_joint_angle:
