@@ -258,7 +258,7 @@ class LeRobotDataset(Dataset):
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
         self.data = []  
-        self.arm2stats_dict = {}
+        self.arm2stats_dict = None
         self.action_horizon = action_horizon
         self.video_backend = video_backend
         self.video_backend_kwargs = video_backend_kwargs or {}  
@@ -292,7 +292,7 @@ class LeRobotDataset(Dataset):
         for arm_name, arm_config in self.config['data_groups'].items():
             print(f"  -- Processing arm group: '{arm_name}'")
 
-            norm_arm_list = []
+            # norm_arm_list = []
             self.tasks[arm_name] = {}
             for dataset_name, dataset_config in arm_config.items():
                 print(f"    -- Processing dataset: '{dataset_name}'")
@@ -328,7 +328,7 @@ class LeRobotDataset(Dataset):
                     print(f"already have stats file: {stats_path_after_compute}")
                     with open(stats_path_after_compute, "r") as f:
                         stats = json.load(f)
-                    norm_arm_list.append(stats)
+                    norm_stats_list.append(stats)
                 elif stats_path.exists():
                     stats = compute_lerobot_normalization_stats_from_minmax(stats_path, stat_relative_path)
                    
@@ -336,18 +336,31 @@ class LeRobotDataset(Dataset):
                         json.dump(stats, f, indent=4)
                
                     print(f"computed stats and saved to: {stats_path_after_compute}")
-                    norm_arm_list.append(stats)
+                    norm_stats_list.append(stats)
                 else:
                     raise FileNotFoundError(f"normalization stats file not found: {stats_path}")
             
 
-            self.arm2stats_dict[arm_name] = merge_lerobot_stats(norm_arm_list)
+            self.arm2stats_dict = merge_lerobot_stats(norm_stats_list)
+            
+            # save merged stats for future reference
+            merged_stats_path = Path(".") / "dataset" / "merged_stats_closebox_ft.json"
+            with open(merged_stats_path, "w") as f:
+                json.dump(self.arm2stats_dict, f, indent=4)
 
 
     def _load_trajectories(self):
 
-        
+        manifest_path = Path(".") / "dataset" / "dataset_manifest_closebox_ft.pkl"
 
+        if manifest_path.exists():
+            logging.info(f"Loading dataset manifest directly from {manifest_path}...")
+            with open(manifest_path, 'rb') as f:
+                self.data = pickle.load(f)
+            logging.info(f"Loaded {len(self.data)} episodes from manifest.")
+            return
+        
+        logging.info("Manifest not found. Scanning parquet files (Main Process Only)...")
         parquet_process_units = []
         for arm_name, arm_config in self.config['data_groups'].items():
             for dataset_name, dataset_config in arm_config.items():
@@ -397,6 +410,16 @@ class LeRobotDataset(Dataset):
                         'total_episodes': total_episodes
                     })
                     pbar.update(1)
+        
+        logging.info(f"Saving manifest to {manifest_path}")
+        with open(manifest_path, 'wb') as f:
+            pickle.dump(self.data, f)
+            
+        if not manifest_path.exists():
+            raise RuntimeError("Manifest file was not generated! Check Main Process logs.")
+        
+        with open(manifest_path, 'rb') as f:
+            self.data = pickle.load(f)
         
         print(f"Data processing completed, total {len(self.data)} files generated")
 
@@ -548,7 +571,7 @@ class LeRobotDataset(Dataset):
     
 
         try:
-            norm_stats = self.arm2stats_dict[arm_key]
+            norm_stats = self.arm2stats_dict
         except KeyError:
         
             raise KeyError(f"Normalization stats not found for arm_key={arm_key} and dataset_key={dataset_key}")

@@ -292,12 +292,37 @@ def load_checkpoint_with_deepspeed(model_engine, load_dir, accelerator, tag="ste
     
 
 
-def get_and_clip_grad_norm(accelerator, model, max_norm: float = 1.0):
-    """
-    Clips gradient norm and returns the total norm before clipping.
-    """
-    total_norm = accelerator.clip_grad_norm_(model.parameters(), max_norm)
-    return total_norm
+# def get_and_clip_grad_norm(accelerator, model, max_norm: float = 1.0):
+#     """
+#     Clips gradient norm and returns the total norm before clipping.
+#     """
+#     total_norm = accelerator.clip_grad_norm_(model.parameters(), max_norm)
+#     return total_norm
+
+def get_and_clip_grad_norm(accelerator, model, loss, max_norm: float = 1.0):
+
+    if hasattr(accelerator, "get_global_grad_norm") and hasattr(accelerator, "clip_grad_norm_"):
+       
+        total_norm = accelerator.get_global_grad_norm()
+        accelerator.clip_grad_norm_(model.parameters(), max_norm)
+        clipped_norm = accelerator.get_global_grad_norm()
+    else:
+ 
+        grad_norms = [p.grad.norm(2) for p in model.parameters() if p.grad is not None]
+        if len(grad_norms) == 0:
+            total_norm = torch.tensor(0.0, device=loss.device)
+        else:
+            total_norm = torch.norm(torch.stack(grad_norms), 2)
+
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+
+        clipped_grad_norms = [p.grad.norm(2) for p in model.parameters() if p.grad is not None]
+        if len(clipped_grad_norms) == 0:
+            clipped_norm = torch.tensor(0.0, device=loss.device)
+        else:
+            clipped_norm = torch.norm(torch.stack(clipped_grad_norms), 2)
+
+    return total_norm, clipped_norm
 
 def get_optimizer_momentum_norm(optimizer: torch.optim.Optimizer, accelerator) -> torch.Tensor:
     """
@@ -495,8 +520,8 @@ def train(config):
             accelerator.backward(loss)
 
             # === Clip grad norm ===
-            # total_norm, clipped_norm = get_and_clip_grad_norm(accelerator, model, loss, max_norm)
-            total_norm = get_and_clip_grad_norm(accelerator, model, max_norm)
+            total_norm, clipped_norm = get_and_clip_grad_norm(accelerator, model, loss, max_norm)
+            # total_norm = get_and_clip_grad_norm(accelerator, model, max_norm)
 
             optimizer.step()
             scheduler.step()
