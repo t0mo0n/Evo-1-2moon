@@ -29,8 +29,8 @@ class Normalizer:
         else:
             stats = stats_or_path
 
-        if len(stats) != 1:
-            raise ValueError(f"norm_stats.json should contain only one robot key, but: {list(stats.keys())}")
+        # if len(stats) != 1:
+            # raise ValueError(f"norm_stats.json should contain only one robot key, but: {list(stats.keys())}")
 
         if isinstance(normalization_type, str):
             normalization_type = NormalizationType(normalization_type)
@@ -38,8 +38,9 @@ class Normalizer:
         print(f"Using normalization type: {self.normalization_type}")
         self.target_dim = 24
 
-        robot_key = list(stats.keys())[0]
-        robot_stats = stats[robot_key]
+        # robot_key = list(stats.keys())[0]
+        # robot_stats = stats[robot_key]
+        robot_stats = stats
 
         self.state_stats = self._prepare_stats(robot_stats.get("observation.state", {}), "observation.state")
         self.action_stats = self._prepare_stats(robot_stats.get("action", {}), "action")
@@ -70,10 +71,15 @@ class Normalizer:
         eps = 1e-8
         device, dtype = tensor.device, tensor.dtype
         norm_type = self.normalization_type
+        
+        current_dim = tensor.shape[-1]
 
         if norm_type == NormalizationType.NORMAL:
             mean = self._stat_to_device(stats_dict, "mean", device, dtype)
             std = self._stat_to_device(stats_dict, "std", device, dtype)
+            if mean is not None: mean = mean[..., :current_dim]
+            if std is not None: std = std[..., :current_dim]
+            
             if mean is None or std is None:
                 raise ValueError("Normal normalization selected but mean/std are missing in norm_stats.json")
             return (tensor - mean) / (std + eps)
@@ -92,6 +98,9 @@ class Normalizer:
 
         if low is None or high is None:
             raise ValueError("Bounds normalization selected but min/max stats are missing in norm_stats.json")
+
+        low = low[..., :current_dim]
+        high = high[..., :current_dim]
 
         normalized = 2 * (tensor - low) / (high - low + eps) - 1
         if clamp:
@@ -124,11 +133,27 @@ class Normalizer:
 
         if low is None or high is None:
             raise ValueError("Bounds denormalization requested but min/max stats are missing")
+        
+        current_dim = tensor.shape[-1]
+        if low.shape[-1] > current_dim:
+            low = low[..., :current_dim]
+            high = high[..., :current_dim]
 
         return (tensor + 1.0) / 2.0 * (high - low + eps) + low
 
     def normalize_state(self, state: torch.Tensor) -> torch.Tensor:
-        return self._normalize_tensor(state, self.state_stats, clamp=True)
+        norm_state = self._normalize_tensor(state, self.state_stats, clamp=True)
+
+        if norm_state.shape[-1] < self.target_dim:
+            padding_size = self.target_dim - norm_state.shape[-1]
+            pad_tensor = torch.zeros(
+                (*norm_state.shape[:-1], padding_size), 
+                dtype=norm_state.dtype, 
+                device=norm_state.device
+            )
+            norm_state = torch.cat([norm_state, pad_tensor], dim=-1)
+            
+        return norm_state
 
     def denormalize_action(self, action: torch.Tensor) -> torch.Tensor:
         if action.ndim == 1:
@@ -180,8 +205,8 @@ def infer_from_json_dict(data: dict, model, normalizer):
     state = torch.tensor(data["state"], dtype=torch.float32, device=device)
     if state.ndim == 1:
         state = state.unsqueeze(0)
-    if state.shape[1] < 24:
-        state = torch.cat([state, torch.zeros((1, 24 - state.shape[1]), device=device)], dim=1)
+    # if state.shape[1] < 24:
+        # state = torch.cat([state, torch.zeros((1, 24 - state.shape[1]), device=device)], dim=1)
     norm_state = normalizer.normalize_state(state).to(dtype=torch.float32)
 
     

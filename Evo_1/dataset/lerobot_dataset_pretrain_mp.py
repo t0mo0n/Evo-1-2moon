@@ -287,6 +287,13 @@ class LeRobotDataset(Dataset):
         self.tasks = {}
         self.normalization_type = self.config.get("normalization_type", NormalizationType.BOUNDS.value)
         norm_stats_list = []
+        
+        merged_stats_path = Path(".") / "dataset" / "merged_stats.json"
+        if merged_stats_path.exists():
+            with open(merged_stats_path, "r") as f:
+                self.arm2stats_dict = json.load(f)
+            print(f"Loaded merged stats from {merged_stats_path}")
+            return
 
         # for arms
         for arm_name, arm_config in self.config['data_groups'].items():
@@ -341,17 +348,16 @@ class LeRobotDataset(Dataset):
                     raise FileNotFoundError(f"normalization stats file not found: {stats_path}")
             
 
-            self.arm2stats_dict = merge_lerobot_stats(norm_stats_list)
-            
-            # save merged stats for future reference
-            merged_stats_path = Path(".") / "dataset" / "merged_stats_closebox_ft.json"
-            with open(merged_stats_path, "w") as f:
-                json.dump(self.arm2stats_dict, f, indent=4)
+        self.arm2stats_dict = merge_lerobot_stats(norm_stats_list)
+        
+        # save merged stats for future reference
+        with open(merged_stats_path, "w") as f:
+            json.dump(self.arm2stats_dict, f, indent=4)
 
 
     def _load_trajectories(self):
 
-        manifest_path = Path(".") / "dataset" / "dataset_manifest_closebox_ft.pkl"
+        manifest_path = Path(".") / "dataset" / "dataset_manifest.pkl"
 
         if manifest_path.exists():
             logging.info(f"Loading dataset manifest directly from {manifest_path}...")
