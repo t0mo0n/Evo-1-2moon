@@ -25,9 +25,9 @@ class Normalizer:
     def __init__(self, stats_or_path, normalization_type: NormalizationType = NormalizationType.BOUNDS):
         if isinstance(stats_or_path, str):
             with open(stats_or_path, "r") as f:
-                stats = json.load(f)
+                self.stats_map = json.load(f)
         else:
-            stats = stats_or_path
+            self.stats_map = stats_or_path
 
         # if len(stats) != 1:
             # raise ValueError(f"norm_stats.json should contain only one robot key, but: {list(stats.keys())}")
@@ -40,10 +40,11 @@ class Normalizer:
 
         # robot_key = list(stats.keys())[0]
         # robot_stats = stats[robot_key]
-        robot_stats = stats
+        # robot_stats = stats
+        self._cache_stats = {}
 
-        self.state_stats = self._prepare_stats(robot_stats.get("observation.state", {}), "observation.state")
-        self.action_stats = self._prepare_stats(robot_stats.get("action", {}), "action")
+        # self.state_stats = self._prepare_stats(robot_stats.get("observation.state", {}), "observation.state")
+        # self.action_stats = self._prepare_stats(robot_stats.get("action", {}), "action")
 
     def _pad_vector(self, values, name):
         tensor = torch.tensor(values, dtype=torch.float32)
@@ -66,6 +67,30 @@ class Normalizer:
         if tensor is None:
             return None
         return tensor.to(device=device, dtype=dtype)
+    
+    def _get_stats_for(self, arm_key, dataset_key, stats_type):
+        """动态获取指定数据集的统计数据"""
+        cache_key = (arm_key, dataset_key, stats_type)
+        if cache_key in self._cache_stats:
+            return self._cache_stats[cache_key]
+        
+        # 查找原始 stats
+        if arm_key not in self.stats_map:
+             raise ValueError(f"Arm key '{arm_key}' not found in normalization stats.")
+        if dataset_key not in self.stats_map[arm_key]:
+             raise ValueError(f"Dataset key '{dataset_key}' not found in normalization stats for arm '{arm_key}'.")
+             
+        raw_stats = self.stats_map[arm_key][dataset_key]
+        
+        # 区分是 state 还是 action
+        dict_key = "observation.state" if stats_type == "state" else "action"
+        
+        if dict_key not in raw_stats:
+            raise ValueError(f"Key '{dict_key}' not found in stats for {arm_key}/{dataset_key}")
+            
+        prepared = self._prepare_stats(raw_stats[dict_key], dict_key)
+        self._cache_stats[cache_key] = prepared
+        return prepared
 
     def _normalize_tensor(self, tensor: torch.Tensor, stats_dict, clamp: bool) -> torch.Tensor:
         eps = 1e-8
@@ -141,8 +166,9 @@ class Normalizer:
 
         return (tensor + 1.0) / 2.0 * (high - low + eps) + low
 
-    def normalize_state(self, state: torch.Tensor) -> torch.Tensor:
-        norm_state = self._normalize_tensor(state, self.state_stats, clamp=True)
+    def normalize_state(self, state: torch.Tensor, arm_key: str, dataset_key: str) -> torch.Tensor:
+        stats = self._get_stats_for(arm_key, dataset_key, "state")
+        norm_state = self._normalize_tensor(state, stats, clamp=True)
 
         if norm_state.shape[-1] < self.target_dim:
             padding_size = self.target_dim - norm_state.shape[-1]
@@ -155,10 +181,24 @@ class Normalizer:
             
         return norm_state
 
-    def denormalize_action(self, action: torch.Tensor) -> torch.Tensor:
+    def denormalize_action(self, action: torch.Tensor, arm_key: str, dataset_key: str) -> torch.Tensor:
         if action.ndim == 1:
             action = action.view(1, -1)
-        return self._denormalize_tensor(action, self.action_stats)
+        # 获取对应 Stats
+        stats = self._get_stats_for(arm_key, dataset_key, "action")
+        denorm_action = self._denormalize_tensor(action, stats)
+
+        # 检查维度并补零到 24 维
+        if denorm_action.shape[-1] < self.target_dim:
+            padding_size = self.target_dim - denorm_action.shape[-1]
+            pad_tensor = torch.zeros(
+                (*denorm_action.shape[:-1], padding_size), 
+                dtype=denorm_action.dtype, 
+                device=denorm_action.device
+            )
+            denorm_action = torch.cat([denorm_action, pad_tensor], dim=-1)
+
+        return denorm_action
 
 
 def load_model_and_normalizer(ckpt_dir):
@@ -194,6 +234,10 @@ def decode_image_from_list(img_list):
 def infer_from_json_dict(data: dict, model, normalizer):
     device = "cuda"
     model_dtype = next(model.parameters()).dtype
+    # arm_key = data["arm_key"]
+    arm_key = "franka_joint_angle"
+    # dataset_key = data["dataset_key"] 
+    dataset_key = "close_box_120_w_last"
 
   
     images = [decode_image_from_list(img) for img in data["image"]]
@@ -207,7 +251,7 @@ def infer_from_json_dict(data: dict, model, normalizer):
         state = state.unsqueeze(0)
     # if state.shape[1] < 24:
         # state = torch.cat([state, torch.zeros((1, 24 - state.shape[1]), device=device)], dim=1)
-    norm_state = normalizer.normalize_state(state).to(dtype=torch.float32)
+    norm_state = normalizer.normalize_state(state, arm_key, dataset_key).to(dtype=torch.float32)
 
     
     prompt = data["prompt"]
@@ -226,7 +270,7 @@ def infer_from_json_dict(data: dict, model, normalizer):
             action_mask=action_mask
         )
         action = action.reshape(1, -1, 24)
-        action = normalizer.denormalize_action(action[0])
+        action = normalizer.denormalize_action(action[0], arm_key, dataset_key)
         return action.cpu().numpy().tolist()
 
 

@@ -103,6 +103,8 @@ def merge_lerobot_stats(stats_list: List[Dict[str, Dict[str, List[float]]]]) -> 
                         pad_val = np.inf
                     elif metric in {"max", "q99"}:
                         pad_val = -np.inf
+                    elif metric in {"mean", "std"}:
+                        pad_val = np.nan
                     else:
                         pad_val = 0.0
                     
@@ -118,7 +120,10 @@ def merge_lerobot_stats(stats_list: List[Dict[str, Dict[str, List[float]]]]) -> 
             elif metric in {"max", "q99"}:
                 merged_val = np.max(stacked, axis=0)
             elif metric in {"mean", "std"}:
-                merged_val = np.mean(stacked, axis=0)
+                # 使用 nanmean 忽略 padding 的部分
+                merged_val = np.nanmean(stacked, axis=0)
+                # 如果某列全是 NaN（虽然不太可能），nanmean 会报 RuntimeWarning 并返回 NaN  
+                merged_val = np.nan_to_num(merged_val, nan=0.0) 
             else:
                 merged_val = stacked[0]
 
@@ -286,20 +291,20 @@ class LeRobotDataset(Dataset):
         self.episodes = []
         self.tasks = {}
         self.normalization_type = self.config.get("normalization_type", NormalizationType.BOUNDS.value)
-        norm_stats_list = []
+        self.dataset_stats_map = {}
         
-        merged_stats_path = Path(".") / "dataset" / "merged_stats.json"
-        if merged_stats_path.exists():
-            with open(merged_stats_path, "r") as f:
-                self.arm2stats_dict = json.load(f)
-            print(f"Loaded merged stats from {merged_stats_path}")
-            return
+        # merged_stats_path = Path(".") / "dataset" / "merged_stats.json"
+        # if merged_stats_path.exists():
+        #     with open(merged_stats_path, "r") as f:
+        #         self.arm2stats_dict = json.load(f)
+        #     print(f"Loaded merged stats from {merged_stats_path}")
+        #     return
 
         # for arms
         for arm_name, arm_config in self.config['data_groups'].items():
             print(f"  -- Processing arm group: '{arm_name}'")
 
-            # norm_arm_list = []
+            self.dataset_stats_map[arm_name] = {} 
             self.tasks[arm_name] = {}
             for dataset_name, dataset_config in arm_config.items():
                 print(f"    -- Processing dataset: '{dataset_name}'")
@@ -335,7 +340,7 @@ class LeRobotDataset(Dataset):
                     print(f"already have stats file: {stats_path_after_compute}")
                     with open(stats_path_after_compute, "r") as f:
                         stats = json.load(f)
-                    norm_stats_list.append(stats)
+                    self.dataset_stats_map[arm_name][dataset_name] = stats
                 elif stats_path.exists():
                     stats = compute_lerobot_normalization_stats_from_minmax(stats_path, stat_relative_path)
                    
@@ -343,16 +348,17 @@ class LeRobotDataset(Dataset):
                         json.dump(stats, f, indent=4)
                
                     print(f"computed stats and saved to: {stats_path_after_compute}")
-                    norm_stats_list.append(stats)
+                    self.dataset_stats_map[arm_name][dataset_name] = stats
                 else:
                     raise FileNotFoundError(f"normalization stats file not found: {stats_path}")
             
 
-        self.arm2stats_dict = merge_lerobot_stats(norm_stats_list)
+        # self.arm2stats_dict = merge_lerobot_stats(norm_stats_list)
         
         # save merged stats for future reference
-        with open(merged_stats_path, "w") as f:
-            json.dump(self.arm2stats_dict, f, indent=4)
+        # with open(merged_stats_path, "w") as f:
+        #     json.dump(self.arm2stats_dict, f, indent=4)
+        self.arm2stats_dict = self.dataset_stats_map
 
 
     def _load_trajectories(self):
@@ -647,7 +653,6 @@ class LeRobotDataset(Dataset):
                     f"Stats dimension ({stat_t.shape[-1]}) is smaller than "
                     f"tensor dimension ({input_dim}) for {stats_name}.{key}"
                 )
-            # ------------------------
             
             return stat_t
 
