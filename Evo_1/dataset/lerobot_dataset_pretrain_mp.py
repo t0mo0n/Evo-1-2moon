@@ -20,6 +20,8 @@ import logging
 import pickle
 from enum import Enum
 
+from .dataset_process_suite import get_suite, BaseProcessSuite
+
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
 
@@ -137,7 +139,12 @@ def _process_parquet_file_worker(args):
     
     use_delta_action = dataset_config.get('use_delta_action', True)
     
+    suite_name = dataset_config.get('process_suite', 'default')
+    suite_config = dataset_config.get('suite_config', {})
+    
     try:
+        suite = get_suite(suite_name, suite_config)
+        
         view_map = dataset_config.get('view_map', None)
         if not view_map:
             logging.info(f"did not find view_map for '{arm_name}-{dataset_name}', use default mapping")
@@ -171,21 +178,12 @@ def _process_parquet_file_worker(args):
             logging.info(f"build {cache_filename}")
             sub_df = df.iloc[i: i + action_horizon]
             
-            # convert actions to relative actions from first state
-            init_state = sub_df.iloc[0].get("observation.state", None)
-            if use_delta_action:
-                actions = np.stack(sub_df["action"].to_list())
-                if init_state is not None:
-                    min_dim = min(len(init_state), actions.shape[1])
-                    init_state_broadcast = np.zeros_like(actions)
-                    init_state_broadcast[:, :min_dim] = init_state[:min_dim]
-                    relative_actions = actions - init_state_broadcast
-                else:
-                    logging.warning(f"File {parquet_path} at index {i} has no 'observation.state', actions will not be converted to relative.")
-                    relative_actions = actions
-                actions = relative_actions.tolist()
-            else:
-                actions = sub_df["action"].to_list()
+            # use process suite to extract state and actions
+            processed_data = suite.process(sub_df, use_delta_action=use_delta_action)
+            init_state = processed_data.state
+            actions = processed_data.actions
+            print(f"action dim:{processed_data.action_dim}\n")
+            print(f"state dim:{processed_data.state_dim}\n")
             
             video_paths = {}
             base_video_path = dataset_path / "videos" / parquet_path.parent.name

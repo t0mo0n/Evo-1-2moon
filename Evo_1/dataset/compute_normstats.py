@@ -12,19 +12,29 @@ from typing import Dict, Iterable, List, Tuple
 from tqdm import tqdm
 
 import numpy as np
-from numpy.lib.stride_tricks import sliding_window_view
-import pyarrow.parquet as pq
+import pandas as pd # Changed from pyarrow to pandas to match Suite interface
+
+from .dataset_process_suite import get_suite, ProcessedData
 
 REQUIRED_METRICS: Tuple[str, ...] = ("std", "mean", "min", "max", "q01", "q99")
 
 
-def compute_normstats(dataset_path: Path, use_delta_actions: bool = True, action_horizon: int = 50) -> Dict[str, object]:
+def compute_normstats(
+    dataset_path: Path, 
+    use_delta_actions: bool = True, 
+    action_horizon: int = 50, 
+    dataset_config: Dict = None
+) -> Dict[str, object]:
+    
     meta_dir = dataset_path / "meta"
     data_dir = dataset_path / "data"
     info_path = meta_dir / "info.json"
 
     if not info_path.exists():
         raise FileNotFoundError(f"Missing meta/info.json under {dataset_path}")
+
+    if dataset_config is None:
+        dataset_config = {}
 
     info = json.loads(info_path.read_text())
     print(f"Inspecting dataset at {dataset_path}")
@@ -46,18 +56,31 @@ def compute_normstats(dataset_path: Path, use_delta_actions: bool = True, action
     per_episode: Dict[int, int] = {}
     action_dim = None
     state_dim = None
+    
+    # 存储所有样本的列表
     action_batches: List[np.ndarray] = []
     state_batches: List[np.ndarray] = []
     
+    # 初始化 Process Suite
+    suite_name = dataset_config.get('process_suite', 'default')
+    suite_config = dataset_config.get('suite_config', {})
+    print(f"Using Process Suite: '{suite_name}' with config: {suite_config}")
+    
+    try:
+        suite = get_suite(suite_name, suite_config)
+    except Exception as e:
+        raise RuntimeError(f"Failed to initialize suite '{suite_name}': {e}")
+    
     print(f"Processing {len(parquet_files)} episodes...")
     if use_delta_actions:
-        print(f"Computing relative action statistics with horizon {action_horizon}...")
+        print(f"Computing relative action statistics (via Suite) with horizon {action_horizon}...")
     else:
-        print("Computing absolute action statistics...")
+        print("Computing absolute action statistics (via Suite)...")
 
     for pq_path in tqdm(parquet_files, desc=f"Processing {dataset_path.name}", unit="ep"):
-        table = pq.read_table(pq_path, columns=["action", "observation.state"])
-        frames_here = table.num_rows
+        # 使用 Pandas 读取，与 Dataset 类保持一致
+        df = pd.read_parquet(pq_path)
+        frames_here = len(df)
         total_frames += frames_here
 
         try:
@@ -66,63 +89,67 @@ def compute_normstats(dataset_path: Path, use_delta_actions: bool = True, action
             episode_idx = len(per_episode)
         per_episode[episode_idx] = frames_here
 
-        if frames_here:
-            actions_np = _column_to_numpy(table.column("action"))
-            states_np = _column_to_numpy(table.column("observation.state"))
+        if frames_here > 0:
+            # === Padding 逻辑 (与 Dataset 类保持严格一致) ===
+            last_row = df.iloc[-1:]
+            padding_rows = pd.concat([last_row] * action_horizon, ignore_index=True)
+            df_padded = pd.concat([df, padding_rows], ignore_index=True)
             
-            if use_delta_actions:
-                N, D = actions_np.shape
+            episode_actions = []
+            episode_states = []
+            
+            # === 循环每一帧，调用 Suite 处理 ===
+            # 这里对应 Dataset 类中的逻辑，遍历每一个合法的时间步
+            for i in range(len(df_padded) - action_horizon + 1):
+                sub_df = df_padded.iloc[i : i + action_horizon]
                 
-                pad_vec = actions_np[-1:] # (1, D)
-                padding = np.repeat(pad_vec, action_horizon, axis=0) # (H, D)
-                actions_padded = np.concatenate([actions_np, padding], axis=0) # (N+H, D)
+                # Suite 处理核心：提取 State，提取并转换 Action (如 delta)
+                processed_data: ProcessedData = suite.process(sub_df, use_delta_action=use_delta_actions)
                 
-                # Create sliding windows
-                windows_view = sliding_window_view(actions_padded, action_horizon, axis=0)
-                windows_view = windows_view[:N] # (N, D, H)
-                windows = windows_view.transpose(0, 2, 1) # (N, H, D)
+                # 收集 State (t=0)
+                if processed_data.state is not None:
+                    episode_states.append(processed_data.state)
                 
-                min_dim = min(states_np.shape[1], D)
-                state_broadcast = np.zeros((N, 1, D), dtype=actions_np.dtype)
-                state_broadcast[:, 0, :min_dim] = states_np[:, :min_dim]
+                # 收集 Action (t=0 -> t=H)
+                # processed_data.actions shape: (Horizon, ActionDim)
+                episode_actions.append(processed_data.actions)
                 
-                # Compute relative actions
-                relative_actions = windows - state_broadcast
-                actions_to_store = relative_actions.reshape(-1, D) # (N*H, D)
-                action_batches.append(actions_to_store)
-            else:
-                action_batches.append(actions_np)
-                
-            state_batches.append(states_np)
-            if action_dim is None:
-                action_dim = actions_np.shape[1]
-            if state_dim is None:
-                state_dim = states_np.shape[1]
+                if action_dim is None:
+                    action_dim = processed_data.action_dim
+                if state_dim is None:
+                    state_dim = processed_data.state_dim
+
+            # 将当前 Episode 的数据转为 numpy 并存入 Batch
+            if episode_actions:
+                # Shape: (N, Horizon, ActionDim) -> Reshape to (N * Horizon, ActionDim) for global stats
+                ep_act_np = np.stack(episode_actions)
+                ep_act_flat = ep_act_np.reshape(-1, action_dim)
+                action_batches.append(ep_act_flat)
+            
+            if episode_states:
+                # Shape: (N, StateDim)
+                ep_state_np = np.stack(episode_states)
+                state_batches.append(ep_state_np)
 
     lengths = list(per_episode.values())
     length_stats = {
-        "min": min(lengths),
-        "max": max(lengths),
-        "avg": round(mean(lengths), 2),
+        "min": min(lengths) if lengths else 0,
+        "max": max(lengths) if lengths else 0,
+        "avg": round(mean(lengths), 2) if lengths else 0,
     }
 
     print(
         f"Loaded {len(per_episode)} episodes"
-        f" with {total_frames} frames in action/state columns."
+        f" with {total_frames} frames."
     )
     print(
-        f"Action rows: {sum(len(b) for b in action_batches)} | dim={action_dim}"
+        f"Action rows (flattened windows): {sum(len(b) for b in action_batches)} | dim={action_dim}"
         f"\nState rows:  {sum(len(b) for b in state_batches)} | dim={state_dim}"
-    )
-    print(
-        "Episode length stats (frames):"
-        f" min={length_stats['min']}"
-        f" max={length_stats['max']}"
-        f" mean={length_stats['avg']}"
     )
 
     actions = _concat_batches(action_batches)
     states = _concat_batches(state_batches)
+    
     stats_payload = {
         "action": _vector_stats(actions),
         "observation.state": _vector_stats(states),
@@ -135,25 +162,12 @@ def compute_normstats(dataset_path: Path, use_delta_actions: bool = True, action
     )
     print(f"Wrote global stats (includes q01/q99) to {stats_path}.")
 
-    # Diagnose existing per-episode stats coverage for context.
+    # Per-episode check logic (Unchanged mostly, just logging)
     per_episode_stats = meta_dir / "episodes_stats.jsonl"
     present_metrics: Iterable[str] = tuple()
     missing_metrics: Iterable[str] = REQUIRED_METRICS
     if per_episode_stats.exists():
         present_metrics, missing_metrics = _collect_metric_keys(per_episode_stats)
-        print(
-            f"Per-episode stats file: {per_episode_stats.name}."
-            " Metrics present: " + ", ".join(present_metrics)
-        )
-        if missing_metrics:
-            print(
-                "Missing targets (per-episode file): "
-                + ", ".join(
-                    metric for metric in REQUIRED_METRICS if metric in missing_metrics
-                )
-            )
-        else:
-            print("Per-episode stats already cover all required metrics.")
     else:
         print("episodes_stats.jsonl not found; only global stats were produced.")
 
@@ -165,8 +179,6 @@ def compute_normstats(dataset_path: Path, use_delta_actions: bool = True, action
         "state_dim": state_dim,
         "episode_length_stats": length_stats,
         "stats_file": stats_path.name,
-        "metrics_present": list(present_metrics),
-        "metrics_missing": list(missing_metrics),
     }
 
 
@@ -174,16 +186,6 @@ def _concat_batches(batches: List[np.ndarray]) -> np.ndarray:
     if not batches:
         return np.empty((0, 0), dtype=np.float32)
     return np.concatenate(batches, axis=0)
-
-
-def _column_to_numpy(column) -> np.ndarray:
-    data = column.to_pylist()
-    if not data:
-        return np.empty((0, 0), dtype=np.float32)
-    array = np.asarray(data, dtype=np.float32)
-    if array.ndim == 1:
-        array = array[:, None]
-    return array
 
 
 def _vector_stats(array: np.ndarray) -> Dict[str, List[float]]:
@@ -213,36 +215,21 @@ def _collect_metric_keys(stats_path: Path) -> Tuple[List[str], List[str]]:
             stats_section = payload.get("stats")
             if not isinstance(stats_section, dict):
                 continue
-
-            if stats_section and all(
-                isinstance(v, dict) for v in stats_section.values()
-            ):
+            # Logic similar to original file to check coverage
+            if stats_section and all(isinstance(v, dict) for v in stats_section.values()):
                 stats_dicts = stats_section.values()
             else:
                 stats_dicts = [stats_section]
-
             for entry in stats_dicts:
-                if not isinstance(entry, dict):
-                    continue
+                if not isinstance(entry, dict): continue
                 for key in entry.keys():
                     if key in REQUIRED_METRICS:
                         present.add(key)
             if len(present) == len(REQUIRED_METRICS):
                 break
-
-    missing = [metric for metric in REQUIRED_METRICS if metric not in present]
+    missing = [m for m in REQUIRED_METRICS if m not in present]
     return sorted(present), missing
 
-
-def str2bool(v):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Inspect lerobot dataset stats.")
@@ -275,7 +262,14 @@ def main() -> None:
             
             dataset_path = Path(path_str)
             use_delta = dataset_config.get('use_delta_action', True)
-            compute_normstats(dataset_path, use_delta_actions=use_delta, action_horizon=args.action_horizon)
+            
+            # 直接传入整个 dataset_config，里面包含了 process_suite 和 suite_config
+            compute_normstats(
+                dataset_path, 
+                use_delta_actions=use_delta, 
+                action_horizon=args.action_horizon, 
+                dataset_config=dataset_config  # 传入配置
+            )
 
 
 if __name__ == "__main__":

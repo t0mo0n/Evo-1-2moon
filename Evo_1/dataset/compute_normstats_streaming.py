@@ -10,10 +10,12 @@ from typing import Dict, Iterable, List, Tuple
 from tqdm import tqdm
 
 import numpy as np
-from numpy.lib.stride_tricks import sliding_window_view
-import pyarrow.parquet as pq
+import pandas as pd  # 使用 pandas 接替 pyarrow
+
+from .dataset_process_suite import get_suite, ProcessedData
 
 REQUIRED_METRICS: Tuple[str, ...] = ("std", "mean", "min", "max", "q01", "q99")
+
 
 class RunningStats:
     """
@@ -21,14 +23,17 @@ class RunningStats:
     Uses Welford's algorithm for mean/std and reservoir sampling for quantiles.
     Use pooling algo to limit memory usage for quantile estimation.
     """
+
     def __init__(self, dim: int, reservoir_size: int = 50_000_000):
         self.n = 0
         self.dim = dim
         self.mean = np.zeros(dim, dtype=np.float64)
-        self.M2 = np.zeros(dim, dtype=np.float64)  # Sum of squares of differences from the current mean
+        self.M2 = np.zeros(
+            dim, dtype=np.float64
+        )  # Sum of squares of differences from the current mean
         self.min_val = np.full(dim, np.inf, dtype=np.float64)
         self.max_val = np.full(dim, -np.inf, dtype=np.float64)
-        
+
         # Reservoir sampling for quantiles
         self.reservoir_size = reservoir_size
         self.reservoir = np.zeros((reservoir_size, dim), dtype=np.float32)
@@ -55,7 +60,7 @@ class RunningStats:
 
         delta = batch_mean - self.mean
         new_n = self.n + batch_n
-        
+
         self.M2 += batch_m2 + delta**2 * self.n * batch_n / new_n
         self.mean += delta * batch_n / new_n
         self.n = new_n
@@ -65,9 +70,11 @@ class RunningStats:
         if self.reservoir_idx < self.reservoir_size:
             space = self.reservoir_size - self.reservoir_idx
             take = min(space, B)
-            self.reservoir[self.reservoir_idx : self.reservoir_idx + take] = batch[:take].astype(np.float32)
+            self.reservoir[self.reservoir_idx : self.reservoir_idx + take] = batch[
+                :take
+            ].astype(np.float32)
             self.reservoir_idx += take
-            
+
             # process remaining batch
             remaining_batch = batch[take:]
             remaining_start_idx = self.n - B + take
@@ -88,11 +95,11 @@ class RunningStats:
     def compute(self) -> Dict[str, List[float]]:
         if self.n == 0:
             return {k: [] for k in REQUIRED_METRICS}
-        
+
         std = np.sqrt(self.M2 / self.n)
-        
+
         # Compute quantiles from reservoir
-        valid_reservoir = self.reservoir[:self.reservoir_idx]
+        valid_reservoir = self.reservoir[: self.reservoir_idx]
         q01 = np.quantile(valid_reservoir, 0.01, axis=0)
         q99 = np.quantile(valid_reservoir, 0.99, axis=0)
 
@@ -105,13 +112,22 @@ class RunningStats:
             "q99": q99.tolist(),
         }
 
-def compute_normstats(dataset_path: Path, use_delta_actions: bool = True, action_horizon: int = 50) -> Dict[str, object]:
+
+def compute_normstats(
+    dataset_path: Path,
+    use_delta_actions: bool = True,
+    action_horizon: int = 50,
+    dataset_config: Dict = None,
+) -> Dict[str, object]:
     meta_dir = dataset_path / "meta"
     data_dir = dataset_path / "data"
     info_path = meta_dir / "info.json"
 
     if not info_path.exists():
         raise FileNotFoundError(f"Missing meta/info.json under {dataset_path}")
+
+    if dataset_config is None:
+        dataset_config = {}
 
     info = json.loads(info_path.read_text())
     print(f"Inspecting dataset at {dataset_path}")
@@ -131,20 +147,35 @@ def compute_normstats(dataset_path: Path, use_delta_actions: bool = True, action
 
     total_frames = 0
     per_episode: Dict[int, int] = {}
-    
+
     # Initialize Streaming Stats
     action_stats = None
     state_stats = None
-    
-    print(f"Processing {len(parquet_files)} episodes...")
-    if use_delta_actions:
-        print(f"Computing relative action statistics with horizon {action_horizon}...")
-    else:
-        print("Computing absolute action statistics...")
 
-    for pq_path in tqdm(parquet_files, desc=f"Processing {dataset_path.name}", unit="ep"):
-        table = pq.read_table(pq_path, columns=["action", "observation.state"])
-        frames_here = table.num_rows
+    # 初始化 Process Suite
+    suite_name = dataset_config.get("process_suite", "default")
+    suite_config = dataset_config.get("suite_config", {})
+    print(f"Using Process Suite: '{suite_name}' with config: {suite_config}")
+
+    try:
+        suite = get_suite(suite_name, suite_config)
+    except Exception as e:
+        raise RuntimeError(f"Failed to initialize suite '{suite_name}': {e}")
+
+    print(f"Processing {len(parquet_files)} episodes using Streaming method...")
+    if use_delta_actions:
+        print(
+            f"Computing relative action statistics (via Suite) with horizon {action_horizon}..."
+        )
+    else:
+        print("Computing absolute action statistics (via Suite)...")
+
+    for pq_path in tqdm(
+        parquet_files, desc=f"Processing {dataset_path.name}", unit="ep"
+    ):
+        # 使用 Pandas 读取
+        df = pd.read_parquet(pq_path)
+        frames_here = len(df)
         total_frames += frames_here
 
         try:
@@ -153,54 +184,64 @@ def compute_normstats(dataset_path: Path, use_delta_actions: bool = True, action
             episode_idx = len(per_episode)
         per_episode[episode_idx] = frames_here
 
-        if frames_here:
-            actions_np = _column_to_numpy(table.column("action"))
-            states_np = _column_to_numpy(table.column("observation.state"))
-            
-            # Initialize stats objects if first time
-            if action_stats is None:
-                action_stats = RunningStats(dim=actions_np.shape[1])
-            if state_stats is None:
-                state_stats = RunningStats(dim=states_np.shape[1])
+        if frames_here > 0:
+            # === Padding 逻辑 (保持一致性) ===
+            last_row = df.iloc[-1:]
+            padding_rows = pd.concat([last_row] * action_horizon, ignore_index=True)
+            df_padded = pd.concat([df, padding_rows], ignore_index=True)
 
-            # Process Actions
-            if use_delta_actions:
-                N, D = actions_np.shape
-                pad_vec = actions_np[-1:] # (1, D)
-                padding = np.repeat(pad_vec, action_horizon, axis=0) # (H, D)
-                actions_padded = np.concatenate([actions_np, padding], axis=0) # (N+H, D)
+            episode_actions = []
+            episode_states = []
+
+            # === 调用 Suite 处理每一帧 ===
+            for i in range(len(df_padded) - action_horizon + 1):
+                sub_df = df_padded.iloc[i : i + action_horizon]
                 
-                # Create sliding windows
-                windows_view = sliding_window_view(actions_padded, action_horizon, axis=0)
-                windows_view = windows_view[:N] # (N, D, H)
-                windows = windows_view.transpose(0, 2, 1) # (N, H, D)
+                processed_data: ProcessedData = suite.process(
+                    sub_df, use_delta_action=use_delta_actions
+                )
+
+                # 收集 Action (Flatten it later)
+                # processed_data.actions shape: (Horizon, ActionDim)
+                episode_actions.append(processed_data.actions)
+
+                # 收集 State (t=0)
+                if processed_data.state is not None:
+                    episode_states.append(processed_data.state)
+
+            # === 更新 RunningStats ===
+            if episode_actions:
+                # Shape transform: List[ (H, D) ] -> (N, H, D)
+                actions_np = np.stack(episode_actions)
+                action_dim = actions_np.shape[2]
                 
-                min_dim = min(states_np.shape[1], D)
-                state_broadcast = np.zeros((N, 1, D), dtype=actions_np.dtype)
-                state_broadcast[:, 0, :min_dim] = states_np[:, :min_dim]
+                # Flatten the horizon dimension for global statistics
+                # (N, H, D) -> (N * H, D)
+                actions_flat = actions_np.reshape(-1, action_dim)
+
+                if action_stats is None:
+                    action_stats = RunningStats(dim=action_dim)
                 
-                # Compute relative actions
-                relative_actions = windows - state_broadcast
-                actions_to_store = relative_actions.reshape(-1, D) # (N*H, D)
+                action_stats.update(actions_flat)
+
+            if episode_states:
+                # Shape transform: List[ (D_s,) ] -> (N, D_s)
+                states_np = np.stack(episode_states)
+                state_dim = states_np.shape[1]
+
+                if state_stats is None:
+                    state_stats = RunningStats(dim=state_dim)
                 
-                action_stats.update(actions_to_store)
-            else:
-                action_stats.update(actions_np)
-            
-            # Process States
-            state_stats.update(states_np)
+                state_stats.update(states_np)
 
     lengths = list(per_episode.values())
     length_stats = {
-        "min": min(lengths),
-        "max": max(lengths),
-        "avg": round(mean(lengths), 2),
+        "min": min(lengths) if lengths else 0,
+        "max": max(lengths) if lengths else 0,
+        "avg": round(mean(lengths), 2) if lengths else 0,
     }
 
-    print(
-        f"Loaded {len(per_episode)} episodes"
-        f" with {total_frames} frames."
-    )
+    print(f"Loaded {len(per_episode)} episodes" f" with {total_frames} frames.")
     print(
         "Episode length stats (frames):"
         f" min={length_stats['min']}"
@@ -255,17 +296,9 @@ def compute_normstats(dataset_path: Path, use_delta_actions: bool = True, action
     }
 
 
-def _column_to_numpy(column) -> np.ndarray:
-    data = column.to_pylist()
-    if not data:
-        return np.empty((0, 0), dtype=np.float32)
-    array = np.asarray(data, dtype=np.float32)
-    if array.ndim == 1:
-        array = array[:, None]
-    return array
-
 def _empty_stats() -> Dict[str, List[float]]:
     return {metric: [] for metric in REQUIRED_METRICS}
+
 
 def _collect_metric_keys(stats_path: Path) -> Tuple[List[str], List[str]]:
     present = set()
@@ -302,12 +335,13 @@ def _collect_metric_keys(stats_path: Path) -> Tuple[List[str], List[str]]:
 def str2bool(v):
     if isinstance(v, bool):
         return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+    if v.lower() in ("yes", "true", "t", "y", "1"):
         return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+    elif v.lower() in ("no", "false", "f", "n", "0"):
         return False
     else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
+        raise argparse.ArgumentTypeError("Boolean value expected.")
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Inspect lerobot dataset stats.")
@@ -320,7 +354,7 @@ def main() -> None:
         "--action_horizon",
         type=int,
         default=50,
-        help="动作序列的长度 (action_horizon)。"
+        help="动作序列的长度 (action_horizon)。",
     )
     args = parser.parse_args()
     config_path = Path(args.config_path)
@@ -328,19 +362,28 @@ def main() -> None:
         logging.error(f"配置文件不存在: {config_path}")
         return
 
-    with open(config_path, 'r') as f:
+    with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
-    for arm_name, arm_config in config.get('data_groups', {}).items():
+    for arm_name, arm_config in config.get("data_groups", {}).items():
         for dataset_name, dataset_config in arm_config.items():
-            path_str = dataset_config.get('path')
+            path_str = dataset_config.get("path")
             if not path_str:
-                logging.warning(f"数据集 '{arm_name}/{dataset_name}' 未配置路径，跳过。")
+                logging.warning(
+                    f"数据集 '{arm_name}/{dataset_name}' 未配置路径，跳过。"
+                )
                 continue
-            
+
             dataset_path = Path(path_str)
-            use_delta = dataset_config.get('use_delta_action', True)
-            compute_normstats(dataset_path, use_delta_actions=use_delta, action_horizon=args.action_horizon)
+            use_delta = dataset_config.get("use_delta_action", True)
+            
+            # Change: pass dataset_config instead of dataset_name
+            compute_normstats(
+                dataset_path,
+                use_delta_actions=use_delta,
+                action_horizon=args.action_horizon,
+                dataset_config=dataset_config,
+            )
 
 
 if __name__ == "__main__":

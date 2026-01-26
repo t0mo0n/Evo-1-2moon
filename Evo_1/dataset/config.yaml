@@ -5,109 +5,109 @@ max_views: 3
 normalization_type: bounds # options: bounds, normal, bounds_q99
 
 data_groups:
-  franka_joint_angle:
-    droid_joint_angle_w_last:
-      path: /share/taolin/datasets/pretraining_data/droid_1.0.1
-      view_map:
-        image_1: observation.images.exterior_1_left
-        image_2: observation.images.wrist_left
-        image_3: observation.images.exterior_2_left
-      use_delta_action: True
+  # franka_joint_angle:
+  #   droid_joint_angle_w_last:
+      # path: /share/taolin/datasets/pretraining_data/droid_1.0.1
+      # view_map:
+      #   image_1: observation.images.exterior_1_left
+      #   image_2: observation.images.wrist_left
+      #   image_3: observation.images.exterior_2_left
+      # use_delta_action: True
     
-    close_box_120_w_last:
-      path: /share/taolin/datasets/rlbench/close_box_120/close_box_25_08_03_lerobotv21
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_4
-        image_3: observation.images.image_5
-      use_delta_action: True
+  #   close_box_120_w_last:
+  #     path: /share/taolin/datasets/rlbench/close_box_120/close_box_25_08_03_lerobotv21
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_4
+  #       image_3: observation.images.image_5
+  #     use_delta_action: True
 
-    rlbench_close_box_1000_w_last:
-      path: /share/taolin/datasets/rlbench/close_box_1000/close_box_1000_25_08_03_lerobotv21
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_4
-        image_3: observation.images.image_5
-      use_delta_action: True
+  #   rlbench_close_box_1000_w_last:
+  #     path: /share/taolin/datasets/rlbench/close_box_1000/close_box_1000_25_08_03_lerobotv21
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_4
+  #       image_3: observation.images.image_5
+  #     use_delta_action: True
 
-    rlbench_close_fridge_w_last:
-      path: /share/taolin/datasets/rlbench/close_fridge/close_fridge_25_08_03_lerobotv21
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_4
-        image_3: observation.images.image_5
-      use_delta_action: True
+  #   rlbench_close_fridge_w_last:
+  #     path: /share/taolin/datasets/rlbench/close_fridge/close_fridge_25_08_03_lerobotv21
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_4
+  #       image_3: observation.images.image_5
+  #     use_delta_action: True
 
-    rlbench_close_laptop_w_last:
-      path: /share/taolin/datasets/rlbench/close_laptop_lid/close_laptop_lid_25_08_03_lerobotv21
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_4
-        image_3: observation.images.image_5
-      use_delta_action: True
+  #   rlbench_close_laptop_w_last:
+  #     path: /share/taolin/datasets/rlbench/close_laptop_lid/close_laptop_lid_25_08_03_lerobotv21
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_4
+  #       image_3: observation.images.image_5
+  #     use_delta_action: True
 
-    rlbench_phone_on_base_w_last:
-      path: /share/taolin/datasets/rlbench/phone_on_base/phone_on_base_25_08_03_lerobotv21
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_4
-        image_3: observation.images.image_5
-      use_delta_action: True
+  #   rlbench_phone_on_base_w_last:
+  #     path: /share/taolin/datasets/rlbench/phone_on_base/phone_on_base_25_08_03_lerobotv21
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_4
+  #       image_3: observation.images.image_5
+  #     use_delta_action: True
 
-    rlbench_stack_wine_w_last:
-      path: /share/taolin/datasets/rlbench/stack_wine/stack_wine_25_08_03_lerobotv21
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_4
-        image_3: observation.images.image_5
-      use_delta_action: True
+  #   rlbench_stack_wine_w_last:
+  #     path: /share/taolin/datasets/rlbench/stack_wine/stack_wine_25_08_03_lerobotv21
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_4
+  #       image_3: observation.images.image_5
+  #     use_delta_action: True
 
-    rlbench_sweep_to_dustpan_w_last:
-      path: /share/taolin/datasets/rlbench/sweep_to_dustpan/sweep_to_dustpan_25_08_03_lerobotv21
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_4
-        image_3: observation.images.image_5
-      use_delta_action: True
+  #   rlbench_sweep_to_dustpan_w_last:
+  #     path: /share/taolin/datasets/rlbench/sweep_to_dustpan/sweep_to_dustpan_25_08_03_lerobotv21
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_4
+  #       image_3: observation.images.image_5
+  #     use_delta_action: True
 
-    rlbench_take_frame_off_hanger_w_last:
-      path: /share/taolin/datasets/rlbench/take_frame_off_hanger/take_frame_off_hanger_25_08_03_lerobotv21
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_4
-        image_3: observation.images.image_5
-      use_delta_action: True
+  #   rlbench_take_frame_off_hanger_w_last:
+  #     path: /share/taolin/datasets/rlbench/take_frame_off_hanger/take_frame_off_hanger_25_08_03_lerobotv21
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_4
+  #       image_3: observation.images.image_5
+  #     use_delta_action: True
 
-    rlbench_take_unbrella_out_of_unbrella_stand_w_last:
-      path: /share/taolin/datasets/rlbench/take_umbrella_out_of_umbrella_stand/take_umbrella_out_of_umbrella_stand_25_08_03_lerobotv21
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_4
-        image_3: observation.images.image_5
-      use_delta_action: True
+  #   rlbench_take_unbrella_out_of_unbrella_stand_w_last:
+  #     path: /share/taolin/datasets/rlbench/take_umbrella_out_of_umbrella_stand/take_umbrella_out_of_umbrella_stand_25_08_03_lerobotv21
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_4
+  #       image_3: observation.images.image_5
+  #     use_delta_action: True
 
-    rlbench_toilet_seat_down_w_last:
-      path: /share/taolin/datasets/rlbench/toilet_seat_down/toilet_seat_down_25_08_03_lerobotv21
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_4
-        image_3: observation.images.image_5
-      use_delta_action: True
+  #   rlbench_toilet_seat_down_w_last:
+  #     path: /share/taolin/datasets/rlbench/toilet_seat_down/toilet_seat_down_25_08_03_lerobotv21
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_4
+  #       image_3: observation.images.image_5
+  #     use_delta_action: True
 
-    rlbench_water_plants_w_last:
-      path: /share/taolin/datasets/rlbench/water_plants/water_plants_25_08_03_lerobotv21
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_4
-        image_3: observation.images.image_5
-      use_delta_action: True
+  #   rlbench_water_plants_w_last:
+  #     path: /share/taolin/datasets/rlbench/water_plants/water_plants_25_08_03_lerobotv21
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_4
+  #       image_3: observation.images.image_5
+  #     use_delta_action: True
 
-  franka_joint_angle_delta:
-    berkley_rpt_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/berkeley_rpt_lerobot/berkeley_rpt_lerobot
-      view_map:
-        image_1: observation.images.hand_image
-      use_delta_action: False
+  # franka_joint_angle_delta:
+  #   berkley_rpt_lerobotv21:
+  #     path: /share/taolin/datasets/pretraining_data/berkeley_rpt_lerobot/berkeley_rpt_lerobot
+  #     view_map:
+  #       image_1: observation.images.hand_image
+  #     use_delta_action: False
 
   franka_ee_pose_delta:
     libero_10_no_noops_lerobot:
@@ -116,6 +116,12 @@ data_groups:
         image_1: observation.images.image
         image_2: observation.images.wrist_image
       use_delta_action: False
+      process_suite: franka_ee_pose # must set
+      suite_config:  # optional, below is an example of suite_config
+        state_key: observation.state
+        action_key: action
+        gripper_indices: [6]
+        ee_pose_dims: [0, 6]
 
     libero_goal_no_noops_lerobot:
       path: /share/taolin/datasets/libero/libero_goal_no_noops_1.0.0_lerobot
@@ -123,6 +129,7 @@ data_groups:
         image_1: observation.images.image
         image_2: observation.images.wrist_image
       use_delta_action: False
+      process_suite: franka_ee_pose
 
     libero_object_no_noops_lerobot:
       path: /share/taolin/datasets/libero/libero_object_no_noops_1.0.0_lerobot
@@ -130,6 +137,7 @@ data_groups:
         image_1: observation.images.image
         image_2: observation.images.wrist_image
       use_delta_action: False
+      process_suite: franka_ee_pose
 
     libero_spatial_no_noops_lerobot:
       path: /share/taolin/datasets/libero/libero_spatial_no_noops_1.0.0_lerobot
@@ -137,86 +145,87 @@ data_groups:
         image_1: observation.images.image
         image_2: observation.images.wrist_image
       use_delta_action: False
+      process_suite: franka_ee_pose
 
-    austin_buds_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/austin_buds_dataset_lerobot
-      view_map:
-        image_1: observation.images.image
-        image_2: observation.images.wrist_image
-      use_delta_action: False
+    # austin_buds_lerobotv21:
+    #   path: /share/taolin/datasets/pretraining_data/austin_buds_dataset_lerobot
+    #   view_map:
+    #     image_1: observation.images.image
+    #     image_2: observation.images.wrist_image
+    #   use_delta_action: False
 
-    austin_sirius_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/austin_sirius_dataset_lerobot/austin_sirius_dataset_lerobot
-      view_map:
-        image_1: observation.images.image
-        image_2: observation.images.wrist_image
-      use_delta_action: False
+    # austin_sirius_lerobotv21:
+    #   path: /share/taolin/datasets/pretraining_data/austin_sirius_dataset_lerobot/austin_sirius_dataset_lerobot
+    #   view_map:
+    #     image_1: observation.images.image
+    #     image_2: observation.images.wrist_image
+    #   use_delta_action: False
 
-    berkeley_cable_routing_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/berkeley_cable_routing_lerobot/berkeley_cable_routing_lerobot
-      view_map:
-        image_1: observation.images.image
-        image_2: observation.images.wrist45_image
-        image_3: observation.images.top_image
-      use_delta_action: False
+    # berkeley_cable_routing_lerobotv21:
+    #   path: /share/taolin/datasets/pretraining_data/berkeley_cable_routing_lerobot/berkeley_cable_routing_lerobot
+    #   view_map:
+    #     image_1: observation.images.image
+    #     image_2: observation.images.wrist45_image
+    #     image_3: observation.images.top_image
+    #   use_delta_action: False
 
-    cmu_play_fusion_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/cmu_play_fusion_lerobot/cmu_play_fusion_lerobot
-      view_map:
-        image_1: observation.images.image
-      use_delta_action: False
+    # cmu_play_fusion_lerobotv21:
+    #   path: /share/taolin/datasets/pretraining_data/cmu_play_fusion_lerobot/cmu_play_fusion_lerobot
+    #   view_map:
+    #     image_1: observation.images.image
+    #   use_delta_action: False
 
-    fmb_dataset_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/fmb_dataset_lerobot/fmb_dataset_lerobot
-      view_map:
-        image_1: observation.images.image_side_1
-        image_2: observation.images.image_wrist_1
-        image_3: observation.images.image_side_2
-      use_delta_action: False
+    # fmb_dataset_lerobotv21:
+    #   path: /share/taolin/datasets/pretraining_data/fmb_dataset_lerobot/fmb_dataset_lerobot
+    #   view_map:
+    #     image_1: observation.images.image_side_1
+    #     image_2: observation.images.image_wrist_1
+    #     image_3: observation.images.image_side_2
+    #   use_delta_action: False
 
-    furniture_bench_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/furniture_bench_dataset_lerobot/furniture_bench_dataset_lerobot
-      view_map:
-        image_1: observation.images.image
-        image_2: observation.images.wrist_image
-      use_delta_action: False
+    # furniture_bench_lerobotv21:
+    #   path: /share/taolin/datasets/pretraining_data/furniture_bench_dataset_lerobot/furniture_bench_dataset_lerobot
+    #   view_map:
+    #     image_1: observation.images.image
+    #     image_2: observation.images.wrist_image
+    #   use_delta_action: False
 
-    stanford_hydra_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/stanford_hydra_dataset_lerobot/stanford_hydra_dataset_lerobot
-      view_map:
-        image_1: observation.images.image
-        image_2: observation.images.wrist_image
-      use_delta_action: False
+    # stanford_hydra_lerobotv21:
+    #   path: /share/taolin/datasets/pretraining_data/stanford_hydra_dataset_lerobot/stanford_hydra_dataset_lerobot
+    #   view_map:
+    #     image_1: observation.images.image
+    #     image_2: observation.images.wrist_image
+    #   use_delta_action: False
 
-    taco_play_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/taco_play_lerobot/taco_play_lerobot
-      view_map:
-        image_1: observation.images.rgb_static
-        image_2: observation.images.rgb_gripper
-      use_delta_action: False
+    # taco_play_lerobotv21:
+    #   path: /share/taolin/datasets/pretraining_data/taco_play_lerobot/taco_play_lerobot
+    #   view_map:
+    #     image_1: observation.images.rgb_static
+    #     image_2: observation.images.rgb_gripper
+    #   use_delta_action: False
 
-    utaustin_mutex_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/utaustin_mutex_lerobot/utaustin_mutex_lerobot
-      view_map:
-        image_1: observation.images.image
-        image_2: observation.images.wrist_image
-      use_delta_action: False
+    # utaustin_mutex_lerobotv21:
+    #   path: /share/taolin/datasets/pretraining_data/utaustin_mutex_lerobot/utaustin_mutex_lerobot
+    #   view_map:
+    #     image_1: observation.images.image
+    #     image_2: observation.images.wrist_image
+    #   use_delta_action: False
 
-    viola_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/viola_lerobot/viola_lerobot
-      view_map:
-        image_1: observation.images.agentview_rgb
-        image_2: observation.images.eye_in_hand_rgb
-      use_delta_action: False
+    # viola_lerobotv21:
+    #   path: /share/taolin/datasets/pretraining_data/viola_lerobot/viola_lerobot
+    #   view_map:
+    #     image_1: observation.images.agentview_rgb
+    #     image_2: observation.images.eye_in_hand_rgb
+    #   use_delta_action: False
 
-  windowsx_ee_pose_delta:
-    bridge_orig_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/bridge_orig_lerobot
-      view_map:
-        image_1: observation.images.image_0
-        image_2: observation.images.image_1
-        image_3: observation.images.image_2
-      use_delta_action: False
+  # windowsx_ee_pose_delta:
+  #   bridge_orig_lerobotv21:
+  #     path: /share/taolin/datasets/pretraining_data/bridge_orig_lerobot
+  #     view_map:
+  #       image_1: observation.images.image_0
+  #       image_2: observation.images.image_1
+  #       image_3: observation.images.image_2
+  #     use_delta_action: False
 
   franka_ee_abs_pose:
     calvin_abc_d_lerobotv21:
@@ -225,263 +234,278 @@ data_groups:
         image_1: observation.images.rgb_static
         image_2: observation.images.rgb_gripper
       use_delta_action: True
+      process_suite: franka_ee_pose
 
-    iamlab_cmu_pickup_insert_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/iamlab_cmu_pickup_insert_lerobot/iamlab_cmu_pickup_insert_lerobot
+    droid_101_eef_lerobotv21:
+      path: /share/taolin/datasets/pretraining_data/droid_1.0.1
       view_map:
-        image_1: observation.images.image
-        image_2: observation.images.wrist_image
+        image_1: observation.images.exterior_1_left
+        image_2: observation.images.wrist_left
+        image_3: observation.images.exterior_2_left
       use_delta_action: True
+      process_suite: droid_eef
+      suite_config:
+        state_key: observation.state.cartesian_position
+        action_key: action.cartesian_position
+        action_gripper_key: action.gripper_position
+        state_gripper_key: observation.state.gripper_position
 
-    toto_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/toto_lerobot/toto_lerobot
-      view_map:
-        image_1: observation.images.image
-      use_delta_action: True
+    # iamlab_cmu_pickup_insert_lerobotv21:
+    #   path: /share/taolin/datasets/pretraining_data/iamlab_cmu_pickup_insert_lerobot/iamlab_cmu_pickup_insert_lerobot
+    #   view_map:
+    #     image_1: observation.images.image
+    #     image_2: observation.images.wrist_image
+    #   use_delta_action: True
 
-  swayer_ee_pose_delta:
-    meta_world_lerobotv21:
-      path: /share/taolin/datasets/meta_world/metaworld_dataset_v2.1
-      view_map:
-        image_1: observation.images.image
-      use_delta_action: False
+    # toto_lerobotv21:
+    #   path: /share/taolin/datasets/pretraining_data/toto_lerobot/toto_lerobot
+    #   view_map:
+    #     image_1: observation.images.image
+    #   use_delta_action: True
 
-  google_robot_ee_pose_delta:
-    fractal_220817_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/fractal/fractal20220817_data_lerobot
-      view_map:
-        image_1: observation.images.image
-      use_delta_action: False
+  # swayer_ee_pose_delta:
+  #   meta_world_lerobotv21:
+  #     path: /share/taolin/datasets/meta_world/metaworld_dataset_v2.1
+  #     view_map:
+  #       image_1: observation.images.image
+  #     use_delta_action: False
 
-  kuka_iiwa_ee_pose_delta:
-    kuka_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/kuka/kuka_lerobot
-      view_map:
-        image_1: observation.images.image
-      use_delta_action: False
+  # google_robot_ee_pose_delta:
+  #   fractal_220817_lerobotv21:
+  #     path: /share/taolin/datasets/pretraining_data/fractal/fractal20220817_data_lerobot
+  #     view_map:
+  #       image_1: observation.images.image
+  #     use_delta_action: False
 
-  xarm_joint_angle_delta:
-    berkeley_mvp_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/berkeley_mvp_lerobot/berkeley_mvp_lerobot
-      view_map:
-        image_1: observation.images.hand_image
-      use_delta_action: False
+  # kuka_iiwa_ee_pose_delta:
+  #   kuka_lerobotv21:
+  #     path: /share/taolin/datasets/pretraining_data/kuka/kuka_lerobot
+  #     view_map:
+  #       image_1: observation.images.image
+  #     use_delta_action: False
 
-  xarm_ee_pose_delta:
-    language_table_lerobotv21:
-      path: /share/taolin/datasets/pretraining_data/language_table_v2/language_table_lerobot
-      view_map:
-        image_1: observation.images.rgb
-      use_delta_action: False
+  # xarm_joint_angle_delta:
+  #   berkeley_mvp_lerobotv21:
+  #     path: /share/taolin/datasets/pretraining_data/berkeley_mvp_lerobot/berkeley_mvp_lerobot
+  #     view_map:
+  #       image_1: observation.images.hand_image
+  #     use_delta_action: False
+
+  # xarm_ee_pose_delta:
+  #   language_table_lerobotv21:
+  #     path: /share/taolin/datasets/pretraining_data/language_table_v2/language_table_lerobot
+  #     view_map:
+  #       image_1: observation.images.rgb
+  #     use_delta_action: False
     
-  aloha_agilex_twin_joint_angle:
-    robotwin_adjust_bottle_lerobotv21:
-      path: /share/taolin/datasets/robotwin/adjust_bottle_20_10_31_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  # aloha_agilex_twin_joint_angle:
+  #   robotwin_adjust_bottle_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/adjust_bottle_20_10_31_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_beat_block_hammer_lerobotv21:
-      path: /share/taolin/datasets/robotwin/beat_block_hammer_25_10_31_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_beat_block_hammer_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/beat_block_hammer_25_10_31_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_blocks_ranking_rgb_lerobotv21:
-      path: /share/taolin/datasets/robotwin/blocks_ranking_rgb_20_10_31_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_blocks_ranking_rgb_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/blocks_ranking_rgb_20_10_31_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
     
-    robotwin_click_alarmclock_lerobotv21:
-      path: /share/taolin/datasets/robotwin/click_alarmclock_25_10_08_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_click_alarmclock_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/click_alarmclock_25_10_08_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_click_bell_lerobotv21:
-      path: /share/taolin/datasets/robotwin/click_bell_25_10_30_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_click_bell_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/click_bell_25_10_30_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_dump_bin_bigbin_lerobotv21:
-      path: /share/taolin/datasets/robotwin/dump_bin_bigbin_25_10_14_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_dump_bin_bigbin_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/dump_bin_bigbin_25_10_14_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_grab_roller_lerobotv21:
-      path: /share/taolin/datasets/robotwin/grab_roller_25_10_21_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_grab_roller_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/grab_roller_25_10_21_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_hanging_mug_lerobotv21:
-      path: /share/taolin/datasets/robotwin/hanging_mug_25_10_30_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_hanging_mug_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/hanging_mug_25_10_30_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_lift_pot_lerobotv21:
-      path: /share/taolin/datasets/robotwin/lift_pot_25_10_21_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_lift_pot_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/lift_pot_25_10_21_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_move_can_pot_lerobotv21:
-      path: /share/taolin/datasets/robotwin/move_can_pot_25_10_11_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_move_can_pot_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/move_can_pot_25_10_11_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_move_playingcard_away_lerobotv21:
-      path: /share/taolin/datasets/robotwin/move_playingcard_away_25_10_11_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_move_playingcard_away_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/move_playingcard_away_25_10_11_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_move_stapler_pad_lerobotv21:
-      path: /share/taolin/datasets/robotwin/move_stapler_pad_25_10_11_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_move_stapler_pad_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/move_stapler_pad_25_10_11_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_open_laptop_lerobotv21:
-      path: /share/taolin/datasets/robotwin/open_laptop_25_10_21_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_open_laptop_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/open_laptop_25_10_21_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_pick_diverse_bottles_lerobotv21:
-      path: /share/taolin/datasets/robotwin/pick_diverse_bottles_25_10_16_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_pick_diverse_bottles_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/pick_diverse_bottles_25_10_16_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_pick_dual_bottles_lerobotv21:
-      path: /share/taolin/datasets/robotwin/pick_dual_bottles_25_10_16_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_pick_dual_bottles_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/pick_dual_bottles_25_10_16_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_place_bread_basket_lerobotv21:
-      path: /share/taolin/datasets/robotwin/place_bread_basket_25_10_11_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_place_bread_basket_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/place_bread_basket_25_10_11_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_place_bread_skillet_lerobotv21:
-      path: /share/taolin/datasets/robotwin/place_bread_skillet_25_10_17_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_place_bread_skillet_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/place_bread_skillet_25_10_17_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_place_burger_fries_lerobotv21:
-      path: /share/taolin/datasets/robotwin/place_burger_fries_25_10_16_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_place_burger_fries_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/place_burger_fries_25_10_16_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_place_can_basket_lerobotv21:
-      path: /share/taolin/datasets/robotwin/place_can_basket_25_10_17_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_place_can_basket_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/place_can_basket_25_10_17_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_place_cans_plasticbox_lerobotv21:
-      path: /share/taolin/datasets/robotwin/place_cans_plasticbox_25_10_30_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_place_cans_plasticbox_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/place_cans_plasticbox_25_10_30_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_place_container_plate_lerobotv21:
-      path: /share/taolin/datasets/robotwin/place_container_plate_25_10_14_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_place_container_plate_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/place_container_plate_25_10_14_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_place_dual_shoes_lerobotv21:
-      path: /share/taolin/datasets/robotwin/place_dual_shoes_25_10_30_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_place_dual_shoes_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/place_dual_shoes_25_10_30_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_place_empty_cup_lerobotv21:
-      path: /share/taolin/datasets/robotwin/place_empty_cup_25_10_11_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_place_empty_cup_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/place_empty_cup_25_10_11_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_press_stapler_lerobotv21:
-      path: /share/taolin/datasets/robotwin/press_stapler_25_10_16_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_press_stapler_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/press_stapler_25_10_16_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_put_object_cabinet_lerobotv21:
-      path: /share/taolin/datasets/robotwin/put_object_cabinet_25_10_14_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_put_object_cabinet_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/put_object_cabinet_25_10_14_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
-    robotwin_turn_switch_lerobotv21:
-      path: /share/taolin/datasets/robotwin/turn_switch_25_10_11_v2.1
-      view_map:
-        image_1: observation.images.image_1
-        image_2: observation.images.image_2
-        image_3: observation.images.image_3
-      use_delta_action: True
+  #   robotwin_turn_switch_lerobotv21:
+  #     path: /share/taolin/datasets/robotwin/turn_switch_25_10_11_v2.1
+  #     view_map:
+  #       image_1: observation.images.image_1
+  #       image_2: observation.images.image_2
+  #       image_3: observation.images.image_3
+  #     use_delta_action: True
 
   ##############################################################################
   # Your embodiment_name:
