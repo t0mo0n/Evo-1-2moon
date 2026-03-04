@@ -231,13 +231,13 @@ def decode_image_from_list(img_list):
 
 
 
-def infer_from_json_dict(data: dict, model, normalizer):
+def infer_from_json_dict(data: dict, model, normalizer, arm_key, dataset_key):
     device = "cuda"
     model_dtype = next(model.parameters()).dtype
     # arm_key = data["arm_key"]
-    arm_key = "franka_joint_angle"
+    # arm_key = "franka_joint_angle"
     # dataset_key = data["dataset_key"] 
-    dataset_key = "close_box_120_w_last"
+    # dataset_key = "close_box_120_w_last"
 
   
     images = [decode_image_from_list(img) for img in data["image"]]
@@ -274,14 +274,14 @@ def infer_from_json_dict(data: dict, model, normalizer):
         return action.cpu().numpy().tolist()
 
 
-async def handle_request(websocket, model, normalizer):
+async def handle_request(websocket, model, normalizer, arm_key, dataset_key):
     print("Client connected")
     try:
         async for message in websocket:
            
             json_data = json.loads(message)
             print(f"Received JSON observation")
-            actions = infer_from_json_dict(json_data, model, normalizer)
+            actions = infer_from_json_dict(json_data, model, normalizer, arm_key, dataset_key)
             await websocket.send(json.dumps(actions))
             print("Sent action chunk")
 
@@ -296,6 +296,10 @@ if __name__ == "__main__":
     #Example: ckpt_dir = "/home/dell/checkpoints/Evo1/Evo1_MetaWorld/"
 
     port = 9000
+    
+    # Specialized for different downstream tasks
+    arm_key = "franka_joint_angle" # Keep the same name as in your norm_stats.json, which is usually the same as the arm name in config.yaml
+    dataset_key = "close_box_120_w_last"
 
     print("Loading EVO_1 model...")
     model, normalizer = load_model_and_normalizer(ckpt_dir)
@@ -303,7 +307,7 @@ if __name__ == "__main__":
     async def main():
         print(f"EVO_1 server running at ws://0.0.0.0:{port}")
         async with websockets.serve(
-            lambda ws: handle_request(ws, model, normalizer),
+            lambda ws: handle_request(ws, model, normalizer, arm_key, dataset_key),
             "0.0.0.0", port, max_size=100_000_000
         ):
             await asyncio.Future()

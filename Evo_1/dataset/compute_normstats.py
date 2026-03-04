@@ -12,7 +12,7 @@ from typing import Dict, Iterable, List, Tuple
 from tqdm import tqdm
 
 import numpy as np
-import pandas as pd # Changed from pyarrow to pandas to match Suite interface
+import pandas as pd
 
 from .dataset_process_suite import get_suite, ProcessedData
 
@@ -57,11 +57,9 @@ def compute_normstats(
     action_dim = None
     state_dim = None
     
-    # 存储所有样本的列表
     action_batches: List[np.ndarray] = []
     state_batches: List[np.ndarray] = []
-    
-    # 初始化 Process Suite
+
     suite_name = dataset_config.get('process_suite', 'default')
     suite_config = dataset_config.get('suite_config', {})
     print(f"Using Process Suite: '{suite_name}' with config: {suite_config}")
@@ -78,7 +76,6 @@ def compute_normstats(
         print("Computing absolute action statistics (via Suite)...")
 
     for pq_path in tqdm(parquet_files, desc=f"Processing {dataset_path.name}", unit="ep"):
-        # 使用 Pandas 读取，与 Dataset 类保持一致
         df = pd.read_parquet(pq_path)
         frames_here = len(df)
         total_frames += frames_here
@@ -90,28 +87,22 @@ def compute_normstats(
         per_episode[episode_idx] = frames_here
 
         if frames_here > 0:
-            # === Padding 逻辑 (与 Dataset 类保持严格一致) ===
+            # Keep padding behavior aligned with dataset sampling.
             last_row = df.iloc[-1:]
             padding_rows = pd.concat([last_row] * action_horizon, ignore_index=True)
             df_padded = pd.concat([df, padding_rows], ignore_index=True)
             
             episode_actions = []
             episode_states = []
-            
-            # === 循环每一帧，调用 Suite 处理 ===
-            # 这里对应 Dataset 类中的逻辑，遍历每一个合法的时间步
+
             for i in range(len(df_padded) - action_horizon + 1):
                 sub_df = df_padded.iloc[i : i + action_horizon]
-                
-                # Suite 处理核心：提取 State，提取并转换 Action (如 delta)
+
                 processed_data: ProcessedData = suite.process(sub_df, use_delta_action=use_delta_actions)
-                
-                # 收集 State (t=0)
+
                 if processed_data.state is not None:
                     episode_states.append(processed_data.state)
-                
-                # 收集 Action (t=0 -> t=H)
-                # processed_data.actions shape: (Horizon, ActionDim)
+
                 episode_actions.append(processed_data.actions)
                 
                 if action_dim is None:
@@ -119,15 +110,12 @@ def compute_normstats(
                 if state_dim is None:
                     state_dim = processed_data.state_dim
 
-            # 将当前 Episode 的数据转为 numpy 并存入 Batch
             if episode_actions:
-                # Shape: (N, Horizon, ActionDim) -> Reshape to (N * Horizon, ActionDim) for global stats
                 ep_act_np = np.stack(episode_actions)
                 ep_act_flat = ep_act_np.reshape(-1, action_dim)
                 action_batches.append(ep_act_flat)
             
             if episode_states:
-                # Shape: (N, StateDim)
                 ep_state_np = np.stack(episode_states)
                 state_batches.append(ep_state_np)
 
@@ -162,7 +150,6 @@ def compute_normstats(
     )
     print(f"Wrote global stats (includes q01/q99) to {stats_path}.")
 
-    # Per-episode check logic (Unchanged mostly, just logging)
     per_episode_stats = meta_dir / "episodes_stats.jsonl"
     present_metrics: Iterable[str] = tuple()
     missing_metrics: Iterable[str] = REQUIRED_METRICS
@@ -215,13 +202,13 @@ def _collect_metric_keys(stats_path: Path) -> Tuple[List[str], List[str]]:
             stats_section = payload.get("stats")
             if not isinstance(stats_section, dict):
                 continue
-            # Logic similar to original file to check coverage
             if stats_section and all(isinstance(v, dict) for v in stats_section.values()):
                 stats_dicts = stats_section.values()
             else:
                 stats_dicts = [stats_section]
             for entry in stats_dicts:
-                if not isinstance(entry, dict): continue
+                if not isinstance(entry, dict):
+                    continue
                 for key in entry.keys():
                     if key in REQUIRED_METRICS:
                         present.add(key)
@@ -236,18 +223,18 @@ def main() -> None:
     parser.add_argument(
         "config_path",
         type=str,
-        help="指向数据集配置文件（如 config.yaml）的路径。",
+        help="The path to the dataset configuration file (e.g., config.yaml).",
     )
     parser.add_argument(
         "--action_horizon",
         type=int,
         default=50,
-        help="动作序列的长度 (action_horizon)。"
+        help="The length of action sequences (action_horizon)."
     )
     args = parser.parse_args()
     config_path = Path(args.config_path)
     if not config_path.exists():
-        logging.error(f"配置文件不存在: {config_path}")
+        logging.error(f"Configuration file does not exist: {config_path}")
         return
 
     with open(config_path, 'r') as f:
@@ -257,18 +244,17 @@ def main() -> None:
         for dataset_name, dataset_config in arm_config.items():
             path_str = dataset_config.get('path')
             if not path_str:
-                logging.warning(f"数据集 '{arm_name}/{dataset_name}' 未配置路径，跳过。")
+                logging.warning(f"Dataset '{arm_name}/{dataset_name}' has no path configured, skipping.")
                 continue
             
             dataset_path = Path(path_str)
             use_delta = dataset_config.get('use_delta_action', True)
-            
-            # 直接传入整个 dataset_config，里面包含了 process_suite 和 suite_config
+
             compute_normstats(
                 dataset_path, 
                 use_delta_actions=use_delta, 
                 action_horizon=args.action_horizon, 
-                dataset_config=dataset_config  # 传入配置
+                dataset_config=dataset_config
             )
 
 

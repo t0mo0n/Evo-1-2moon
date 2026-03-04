@@ -1,4 +1,4 @@
-# extandable dataset processing suites for various robotics datasets
+# Extensible dataset processing suites for various robotics datasets.
 
 import numpy as np
 import pandas as pd
@@ -10,31 +10,37 @@ import logging
 
 @dataclass
 class ProcessedData:
-    """处理后的数据结构"""
-    state: Optional[np.ndarray]  # 初始状态 (用于归一化参考)
-    actions: np.ndarray          # action 序列 [horizon, action_dim]
-    state_dim: int               # 状态维度
-    action_dim: int              # 动作维度
+    """Container returned by a suite after processing one horizon window."""
+    state: Optional[np.ndarray]  # Initial state at t=0, used for normalization stats.
+    actions: np.ndarray          # Action sequence with shape [horizon, action_dim].
+    state_dim: int               # Dimension of `state` (0 if state is unavailable).
+    action_dim: int              # Number of action channels.
 
 
 class BaseProcessSuite(ABC):
-    """处理套组基类"""
+    """Base class for all dataset-specific processing suites.
+
+    A suite defines how to:
+    1) read state/action fields from raw dataset rows,
+    2) optionally convert absolute actions into relative (delta) actions,
+    3) return a consistent `ProcessedData` object used by downstream stats code.
+    """
     
     def __init__(self, config: Dict[str, Any] = None):
         """
         Args:
-            config: 套组配置，可包含特定套组需要的额外参数
+            config: Suite-specific configuration dictionary.
         """
         self.config = config or {}
     
     @abstractmethod
     def extract_state(self, row: pd.Series) -> Optional[np.ndarray]:
-        """从单行数据中提取状态"""
+        """Extract state from one row (typically the first row in a horizon window)."""
         pass
     
     @abstractmethod
     def extract_actions(self, sub_df: pd.DataFrame) -> np.ndarray:
-        """从子数据帧中提取动作序列"""
+        """Extract action sequence from a horizon-sized dataframe window."""
         pass
     
     def compute_relative_actions(
@@ -44,15 +50,16 @@ class BaseProcessSuite(ABC):
         relative_dims: List[Tuple[int, int]]
     ) -> np.ndarray:
         """
-        计算相对动作
+        Convert selected action dimensions from absolute values to relative values.
         
         Args:
-            actions: 原始动作 [horizon, action_dim]
-            states: 状态序列 [horizon, state_dim]
-            relative_dims: 需要转换为相对值的维度范围列表，如 [(0, 6), (7, 13)]
+            actions: Raw action array with shape [horizon, action_dim].
+            states: State array with shape [horizon, state_dim].
+            relative_dims: Inclusive-exclusive index ranges to convert, e.g.
+                [(0, 6), (7, 13)].
         
         Returns:
-            相对动作 [horizon, action_dim]
+            Relative action array with shape [horizon, action_dim].
         """
         relative_actions = actions.copy()
         
@@ -68,22 +75,22 @@ class BaseProcessSuite(ABC):
         use_delta_action: bool = True
     ) -> ProcessedData:
         """
-        主处理方法
+        Main processing entry for one horizon window.
         
         Args:
-            sub_df: 包含 action_horizon 行的子数据帧
-            use_delta_action: 是否转换为相对动作
+            sub_df: Dataframe slice containing `action_horizon` rows.
+            use_delta_action: Whether to apply suite-defined relative conversion.
         
         Returns:
-            ProcessedData 对象
+            A `ProcessedData` instance with state, actions, and dimensions.
         """
-        # 提取初始状态
+        # Read the reference state from the first timestep.
         init_state = self.extract_state(sub_df.iloc[0])
         
-        # 提取动作序列
+        # Read the action sequence for this horizon window.
         actions = self.extract_actions(sub_df)
         
-        # 如果需要相对动作，进行转换
+        # Optionally transform absolute actions into relative actions.
         if use_delta_action and init_state is not None:
             actions = self._convert_to_relative(sub_df, actions)
         
@@ -99,15 +106,19 @@ class BaseProcessSuite(ABC):
         sub_df: pd.DataFrame, 
         actions: np.ndarray
     ) -> np.ndarray:
-        """转换为相对动作（子类可重写以自定义行为）"""
+        """Convert actions to relative form (subclasses can override custom logic)."""
         return actions
 
 
 
 class DefaultSuite(BaseProcessSuite):
     """
-    默认套组：直接读取 observation.state 和 action
-    适用于大多数标准 LeRobot 数据集
+    Default suite that reads `observation.state` and `action` directly.
+
+    Relative conversion policy:
+    - If at least 6 dimensions exist, convert [0:6] (typically end-effector pose).
+    - If at least 13 dimensions exist, also convert [7:13] (e.g., second arm).
+    - Gripper dimensions are intentionally not modified by these slices.
     """
     
     def extract_state(self, row: pd.Series) -> Optional[np.ndarray]:
@@ -126,7 +137,7 @@ class DefaultSuite(BaseProcessSuite):
     ) -> np.ndarray:
         states = np.stack(sub_df["observation.state"].to_list())
         
-        # 默认：前6维为末端执行器位姿，7-13维为第二臂（如有）
+        # Default relative ranges: primary EE pose and optional secondary arm.
         relative_dims = []
         action_dim = actions.shape[1]
         state_dim = states.shape[1]
@@ -141,21 +152,38 @@ class DefaultSuite(BaseProcessSuite):
 
 class FrankaEEPoseSuite(BaseProcessSuite):
     """
-    Franka 末端执行器位姿套组
-    适用于: LIBERO, austin_buds, austin_sirius 等
-    
-    特点:
-    - State: observation.state (7D: xyz + rpy + gripper)
-    - Action: action (通常是 7D: delta_xyz + delta_rpy + gripper)
-    - Gripper 保持绝对值
+        Example suite for Franka datasets represented in end-effector pose space.
+
+        Typical use cases:
+        - LIBERO
+        - austin_buds
+        - austin_sirius
+
+        Expected schema (default):
+        - State key: `observation.state`
+            usually 7D = [x, y, z, r, p, y, gripper]
+        - Action key: `action`
+            usually 7D = [x, y, z, r, p, y, gripper] or corresponding command values
+
+        Relative conversion behavior:
+        - Only EE pose dimensions in `ee_pose_dims` (default [0:6]) are converted
+            via `action - state`.
+        - Gripper channel(s) remain absolute on purpose. This avoids changing the
+            semantics of open/close commands.
+
+        Configuration keys:
+        - state_key: column name for state vector
+        - action_key: column name for action vector
+        - ee_pose_dims: tuple(start, end) defining EE pose dimensions to convert
+        - gripper_indices: optional documentation field for gripper positions
     """
     
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__(config)
         self.state_key = self.config.get("state_key", "observation.state")
         self.action_key = self.config.get("action_key", "action")
-        self.gripper_indices = self.config.get("gripper_indices", [6])  # gripper 所在的索引
-        self.ee_pose_dims = self.config.get("ee_pose_dims", (0, 6))  # 末端执行器位姿维度
+        self.gripper_indices = self.config.get("gripper_indices", [6])  # Gripper index/indices.
+        self.ee_pose_dims = self.config.get("ee_pose_dims", (0, 6))  # EE pose dimensions.
     
     def extract_state(self, row: pd.Series) -> Optional[np.ndarray]:
         state = row.get(self.state_key, None)
@@ -183,19 +211,33 @@ class FrankaEEPoseSuite(BaseProcessSuite):
         if actions.shape[1] >= end and states.shape[1] >= end:
             relative_actions[:, start:end] = actions[:, start:end] - states[:, start:end]
         
-        # Gripper 保持绝对值（不做转换）
+        # Gripper values are intentionally left unchanged.
         
         return relative_actions
 
 
 class FrankaJointAngleSuite(BaseProcessSuite):
     """
-    Franka 关节角度套组
-    适用于: RLBench, berkeley_rpt 等
-    
-    特点:
-    - State: observation.state (8D: 7D 关节角度 + gripper)
-    - Action: action (8D: 7D 关节角度 + gripper)
+        Example suite for Franka datasets represented in joint-angle space.
+
+        Typical use cases:
+        - RLBench
+        - berkeley_rpt
+
+        Expected schema (default):
+        - State key: `observation.state`
+            often 8D = [joint_0..joint_6, gripper]
+        - Action key: `action`
+            often 8D = [joint_0..joint_6, gripper]
+
+        Relative conversion behavior:
+        - Convert joint dimensions [0:joint_dims] using `action - state`.
+        - Keep any remaining channels (commonly gripper) unchanged.
+
+        Configuration keys:
+        - state_key: column name for state vector
+        - action_key: column name for action vector
+        - joint_dims: number of leading joint dimensions to convert
     """
     
     def __init__(self, config: Dict[str, Any] = None):
@@ -223,20 +265,33 @@ class FrankaJointAngleSuite(BaseProcessSuite):
         except Exception:
             return actions
         
-        # 关节角度：全部维度都转换为相对值（除了 gripper）
+        # Convert leading joint dimensions; keep trailing channels unchanged.
         relative_dims = [(0, min(self.joint_dims, actions.shape[1], states.shape[1]))]
         return self.compute_relative_actions(actions, states, relative_dims)
 
 
 class DroidEEFSuite(BaseProcessSuite):
     """
-    DROID 末端执行器套组
-    适用于: droid_101_eef
-    
-    特点:
-    - State: observation.state.cartesian_position (6D) + gripper from state[6]
-    - Action: action.cartesian_position (6D) + gripper from action[6]
-    - gripper反向, 需要手动拼接 gripper
+        Example suite for DROID datasets with split Cartesian and gripper fields.
+
+        Typical use case:
+        - droid_101_eef
+
+        Expected schema (default):
+        - State position key: `observation.state.cartesian_position` (6D)
+        - State gripper key: `observation.state.gripper_position` (scalar)
+        - Action position key: `action.cartesian_position` (6D)
+        - Action gripper key: `action.gripper_position` (scalar)
+
+        Key preprocessing behavior:
+        - Build a unified 7D state/action by concatenating Cartesian(6D) + gripper(1D).
+        - Invert gripper with `1 - value` to match the convention used by this project.
+        - During relative conversion, only Cartesian dimensions [0:6] are converted.
+            Gripper stays absolute after inversion.
+
+        Configuration keys:
+        - state_key, action_key
+        - state_gripper_key, action_gripper_key
     """
     
     def __init__(self, config: Dict[str, Any] = None):
@@ -273,7 +328,7 @@ class DroidEEFSuite(BaseProcessSuite):
             return actions
         
         relative_actions = actions.copy()
-        # 只有前6维（cartesian position）转换为相对值
+        # Convert only the first 6 Cartesian dimensions to relative values.
         if actions.shape[1] >= 6 and states.shape[1] >= 6:
             relative_actions[:, :6] = actions[:, :6] - states[:, :6]
         
@@ -282,20 +337,22 @@ class DroidEEFSuite(BaseProcessSuite):
 
 class AlohaJointAngleSuite(BaseProcessSuite):
     """
-    ALOHA 双臂关节角度套组
-    适用于: RoboTwin, ALOHA 数据集
-    
-    特点:
-    - State: observation.state (14D: 7D 左臂 + 7D 右臂)
-    - Action: action (14D: 7D 左臂 + 7D 右臂)
-    - 索引 6 和 13 是 gripper，保持绝对值
+    ALOHA dual-arm joint-angle suite.
+
+    Typical use cases:
+    - RoboTwin
+    - ALOHA datasets
+
+    Typical shape:
+    - 14D = 7D left arm + 7D right arm
+    - Index 6 and 13 are commonly grippers and remain absolute
     """
     
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__(config)
         self.state_key = self.config.get("state_key", "observation.state")
         self.action_key = self.config.get("action_key", "action")
-        self.arm_dims = self.config.get("arm_dims", 7)  # 每条臂的维度
+        self.arm_dims = self.config.get("arm_dims", 7)  # Number of dimensions per arm.
         self.gripper_indices = self.config.get("gripper_indices", [6, 13])
     
     def extract_state(self, row: pd.Series) -> Optional[np.ndarray]:
@@ -321,11 +378,11 @@ class AlohaJointAngleSuite(BaseProcessSuite):
         action_dim = actions.shape[1]
         state_dim = states.shape[1]
         
-        # 左臂关节 (0-5)，跳过 gripper (6)
+        # Left arm joints (0-5), skip gripper at 6.
         if action_dim >= 6 and state_dim >= 6:
             relative_actions[:, :6] = actions[:, :6] - states[:, :6]
         
-        # 右臂关节 (7-12)，跳过 gripper (13)
+        # Right arm joints (7-12), skip gripper at 13.
         if action_dim >= 13 and state_dim >= 13:
             relative_actions[:, 7:13] = actions[:, 7:13] - states[:, 7:13]
         
@@ -334,11 +391,11 @@ class AlohaJointAngleSuite(BaseProcessSuite):
 
 class MetaWorldSuite(BaseProcessSuite):
     """
-    MetaWorld 数据集套组
-    
-    特点:
+    MetaWorld dataset suite.
+
+    Characteristics:
     - State: observation.state
-    - Action: action (4D: delta xyz + gripper)
+    - Action: action (typically 4D: delta xyz + gripper)
     """
     
     def __init__(self, config: Dict[str, Any] = None):
@@ -360,21 +417,21 @@ class MetaWorldSuite(BaseProcessSuite):
         sub_df: pd.DataFrame, 
         actions: np.ndarray
     ) -> np.ndarray:
-        # MetaWorld 的 action 本身就是增量，通常不需要额外处理
+        # MetaWorld actions are usually already delta commands.
         return actions
 
 
 class CustomSuite(BaseProcessSuite):
     """
-    自定义套组：通过配置文件完全自定义行为
-    
-    配置示例:
+    Fully configurable suite driven by config fields.
+
+    Configuration example:
     {
         "state_key": "observation.state",
         "action_key": "action",
-        "action_concat_keys": ["action.cartesian", "action.gripper"],  # 可选：拼接多个键
-        "relative_dims": [[0, 6], [7, 13]],  # 可选：需要转换为相对值的维度
-        "gripper_indices": [6, 13]  # 可选：gripper 索引（保持绝对值）
+        "action_concat_keys": ["action.cartesian", "action.gripper"],  # Optional: concatenate multiple action fields.
+        "relative_dims": [[0, 6], [7, 13]],  # Optional: dimensions to convert to relative values.
+        "gripper_indices": [6, 13]  # Optional: gripper indices (kept absolute by suite logic).
     }
     """
     
@@ -394,7 +451,7 @@ class CustomSuite(BaseProcessSuite):
     
     def extract_actions(self, sub_df: pd.DataFrame) -> np.ndarray:
         if self.action_concat_keys:
-            # 拼接多个键
+            # Concatenate actions from multiple columns.
             arrays = []
             for key in self.action_concat_keys:
                 arr = np.stack(sub_df[key].to_list())
@@ -441,14 +498,14 @@ def register_suite(name: str, suite_class: type):
 
 def get_suite(name: str, config: Dict[str, Any] = None) -> BaseProcessSuite:
     """
-    获取套组实例
+    Create a suite instance by name.
     
     Args:
-        name: 套组名称
-        config: 套组配置
+        name: Suite registry name.
+        config: Suite configuration dictionary.
     
     Returns:
-        套组实例
+        Suite instance.
     """
     if name not in SUITE_REGISTRY:
         available = list(SUITE_REGISTRY.keys())
@@ -458,5 +515,5 @@ def get_suite(name: str, config: Dict[str, Any] = None) -> BaseProcessSuite:
 
 
 def list_available_suites() -> List[str]:
-    """列出所有可用的套组"""
+    """List all registered suite names."""
     return list(SUITE_REGISTRY.keys())

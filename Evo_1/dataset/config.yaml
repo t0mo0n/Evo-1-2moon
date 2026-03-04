@@ -3,6 +3,7 @@ max_action_dim: 24
 max_state_dim: 24
 max_views: 3
 normalization_type: bounds # options: bounds, normal, bounds_q99
+datasets_manifiest: datasets_manifest.pkl # Example: dataset_manifest_eef_libero_10_lerobot21.pkl
 
 data_groups:
   # franka_joint_angle:

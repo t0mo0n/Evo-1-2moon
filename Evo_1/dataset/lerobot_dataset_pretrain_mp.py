@@ -20,7 +20,7 @@ import logging
 import pickle
 from enum import Enum
 
-from .dataset_process_suite import get_suite, BaseProcessSuite
+from dataset.dataset_process_suite import get_suite, BaseProcessSuite
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
@@ -122,9 +122,7 @@ def merge_lerobot_stats(stats_list: List[Dict[str, Dict[str, List[float]]]]) -> 
             elif metric in {"max", "q99"}:
                 merged_val = np.max(stacked, axis=0)
             elif metric in {"mean", "std"}:
-                # 使用 nanmean 忽略 padding 的部分
-                merged_val = np.nanmean(stacked, axis=0)
-                # 如果某列全是 NaN（虽然不太可能），nanmean 会报 RuntimeWarning 并返回 NaN  
+                merged_val = np.nanmean(stacked, axis=0) 
                 merged_val = np.nan_to_num(merged_val, nan=0.0) 
             else:
                 merged_val = stacked[0]
@@ -182,8 +180,6 @@ def _process_parquet_file_worker(args):
             processed_data = suite.process(sub_df, use_delta_action=use_delta_action)
             init_state = processed_data.state
             actions = processed_data.actions
-            print(f"action dim:{processed_data.action_dim}\n")
-            print(f"state dim:{processed_data.state_dim}\n")
             
             video_paths = {}
             base_video_path = dataset_path / "videos" / parquet_path.parent.name
@@ -255,7 +251,7 @@ class LeRobotDataset(Dataset):
 
 
         if cache_dir is None:
-            self.cache_dir = Path("/home/tomoon/codes/Evo-VLA/train_data_cache")
+            self.cache_dir = Path("/home/tomoon/codes/Evo-VLA/train_data_cache") # Need to change to your own path
         else:
             self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -290,15 +286,7 @@ class LeRobotDataset(Dataset):
         self.tasks = {}
         self.normalization_type = self.config.get("normalization_type", NormalizationType.BOUNDS.value)
         self.dataset_stats_map = {}
-        
-        # merged_stats_path = Path(".") / "dataset" / "merged_stats.json"
-        # if merged_stats_path.exists():
-        #     with open(merged_stats_path, "r") as f:
-        #         self.arm2stats_dict = json.load(f)
-        #     print(f"Loaded merged stats from {merged_stats_path}")
-        #     return
 
-        # for arms
         for arm_name, arm_config in self.config['data_groups'].items():
             print(f"  -- Processing arm group: '{arm_name}'")
 
@@ -350,18 +338,15 @@ class LeRobotDataset(Dataset):
                 else:
                     raise FileNotFoundError(f"normalization stats file not found: {stats_path}")
             
-
-        # self.arm2stats_dict = merge_lerobot_stats(norm_stats_list)
-        
-        # save merged stats for future reference
-        # with open(merged_stats_path, "w") as f:
-        #     json.dump(self.arm2stats_dict, f, indent=4)
         self.arm2stats_dict = self.dataset_stats_map
 
 
     def _load_trajectories(self):
 
-        manifest_path = Path(".") / "dataset" / "dataset_manifest.pkl"
+        manifest_dir = Path(".") / "dataset" / "manifests"
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+        manifest_filename = self.config.get("datasets_manifest", "datasets_manifest.pkl")
+        manifest_path = manifest_dir / manifest_filename
 
         if manifest_path.exists():
             logging.info(f"Loading dataset manifest directly from {manifest_path}...")
@@ -581,7 +566,7 @@ class LeRobotDataset(Dataset):
     
 
         try:
-            norm_stats = self.arm2stats_dict
+            norm_stats = self.arm2stats_dict[arm_key][dataset_key]
         except KeyError:
         
             raise KeyError(f"Normalization stats not found for arm_key={arm_key} and dataset_key={dataset_key}")
