@@ -135,7 +135,7 @@ def merge_lerobot_stats(stats_list: List[Dict[str, Dict[str, List[float]]]]) -> 
 def _process_parquet_file_worker(args):
     parquet_path, arm_name, dataset_name, dataset_config, dataset_path, task_mapping, action_horizon, max_samples_per_file, cache_dir = args
     
-    use_delta_action = dataset_config.get('use_delta_action', True)
+    use_delta_action = dataset_config.get('use_delta_action', False)
     
     suite_name = dataset_config.get('process_suite', 'default')
     suite_config = dataset_config.get('suite_config', {})
@@ -317,7 +317,7 @@ class LeRobotDataset(Dataset):
      
                 stats_path = dataset_path / "meta" / "episodes_stats.jsonl"
                 stats_path_after_compute = dataset_path / "meta" / "stats.json"
-                use_delta_action = dataset_config.get('use_delta_action', True)
+                use_delta_action = dataset_config.get('use_delta_action', False)
                 if use_delta_action:
                     stat_relative_path = dataset_path / "meta" / "episodes_stats_action_relative.jsonl"
                 else:

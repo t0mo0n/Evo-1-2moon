@@ -29,22 +29,12 @@ class Normalizer:
         else:
             self.stats_map = stats_or_path
 
-        # if len(stats) != 1:
-            # raise ValueError(f"norm_stats.json should contain only one robot key, but: {list(stats.keys())}")
-
         if isinstance(normalization_type, str):
             normalization_type = NormalizationType(normalization_type)
         self.normalization_type = normalization_type
         print(f"Using normalization type: {self.normalization_type}")
         self.target_dim = 24
-
-        # robot_key = list(stats.keys())[0]
-        # robot_stats = stats[robot_key]
-        # robot_stats = stats
         self._cache_stats = {}
-
-        # self.state_stats = self._prepare_stats(robot_stats.get("observation.state", {}), "observation.state")
-        # self.action_stats = self._prepare_stats(robot_stats.get("action", {}), "action")
 
     def _pad_vector(self, values, name):
         tensor = torch.tensor(values, dtype=torch.float32)
@@ -69,12 +59,11 @@ class Normalizer:
         return tensor.to(device=device, dtype=dtype)
     
     def _get_stats_for(self, arm_key, dataset_key, stats_type):
-        """动态获取指定数据集的统计数据"""
+        """get the relevant stats dict for the given arm/dataset and stat type (state/action)"""
         cache_key = (arm_key, dataset_key, stats_type)
         if cache_key in self._cache_stats:
             return self._cache_stats[cache_key]
         
-        # 查找原始 stats
         if arm_key not in self.stats_map:
              raise ValueError(f"Arm key '{arm_key}' not found in normalization stats.")
         if dataset_key not in self.stats_map[arm_key]:
@@ -82,7 +71,6 @@ class Normalizer:
              
         raw_stats = self.stats_map[arm_key][dataset_key]
         
-        # 区分是 state 还是 action
         dict_key = "observation.state" if stats_type == "state" else "action"
         
         if dict_key not in raw_stats:
@@ -184,11 +172,10 @@ class Normalizer:
     def denormalize_action(self, action: torch.Tensor, arm_key: str, dataset_key: str) -> torch.Tensor:
         if action.ndim == 1:
             action = action.view(1, -1)
-        # 获取对应 Stats
         stats = self._get_stats_for(arm_key, dataset_key, "action")
         denorm_action = self._denormalize_tensor(action, stats)
 
-        # 检查维度并补零到 24 维
+        # Padding if action dim is less than target_dim
         if denorm_action.shape[-1] < self.target_dim:
             padding_size = self.target_dim - denorm_action.shape[-1]
             pad_tensor = torch.zeros(
@@ -298,8 +285,8 @@ if __name__ == "__main__":
     port = 9000
     
     # Specialized for different downstream tasks
-    arm_key = "franka_joint_angle" # Keep the same name as in your norm_stats.json, which is usually the same as the arm name in config.yaml
-    dataset_key = "close_box_120_w_last"
+    arm_key = "franka_ee_pose_delta" # Keep the same name as in your norm_stats.json, which is usually the same as the arm name in config.yaml
+    dataset_key = "libero_10_no_noops_lerobot"
 
     print("Loading EVO_1 model...")
     model, normalizer = load_model_and_normalizer(ckpt_dir)
